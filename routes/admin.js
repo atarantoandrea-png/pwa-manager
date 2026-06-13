@@ -25,13 +25,15 @@ const requireAuth = (req, res, next) => {
 // ─── AUTH ───────────────────────────────────────────────────────────────────
 
 router.post('/auth/login', (req, res) => {
-  const { password } = req.body;
-  const expected = process.env.ADMIN_PASSWORD || 'admin123';
-  if (password === expected) {
+  const { username, password } = req.body;
+  const okUser = (process.env.ADMIN_USERNAME || 'Andrea');
+  const okPass = (process.env.ADMIN_PASSWORD || 'Angra.120');
+  if (username === okUser && password === okPass) {
     req.session.admin = true;
+    req.session.username = username;
     res.json({ ok: true });
   } else {
-    res.status(401).json({ error: 'Password errata' });
+    res.status(401).json({ error: 'Credenziali non valide' });
   }
 });
 

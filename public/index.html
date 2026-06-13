@@ -241,11 +241,15 @@ tbody tr:hover{background:#fafafa}
     <p>Accedi al tuo pannello di gestione PWA</p>
     <form id="login-form">
       <div class="field">
+        <label>Nome utente</label>
+        <input type="text" id="login-username" placeholder="Andrea" required autofocus autocomplete="username">
+      </div>
+      <div class="field">
         <label>Password</label>
-        <input type="password" id="login-password" placeholder="••••••••" required autofocus>
+        <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password">
       </div>
       <button type="submit" class="btn-primary" id="login-btn">Accedi →</button>
-      <div id="login-error">Password errata. Riprova.</div>
+      <div id="login-error">Credenziali non valide. Riprova.</div>
     </form>
   </div>
 </div>
@@ -435,10 +439,11 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const btn = document.getElementById('login-btn');
   const err = document.getElementById('login-error');
+  const username = document.getElementById('login-username').value;
   const password = document.getElementById('login-password').value;
   btn.disabled = true; btn.textContent = 'Accesso...';
   err.style.display = 'none';
-  const res = await api('/auth/login', 'POST', { password });
+  const res = await api('/auth/login', 'POST', { username, password });
   if (res.ok) {
     showApp();
   } else {
