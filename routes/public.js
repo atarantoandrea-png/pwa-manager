@@ -163,7 +163,7 @@ router.get('/:slug/init.js', (req, res) => {
   window.PWAManager = { subscribe: subscribe, slug: SLUG };
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register(BASE + '/' + SLUG + '/sw.js', { scope: '/' });
+    navigator.serviceWorker.register('/sw.js', { scope: '/' });
   }
 })();
 `);
