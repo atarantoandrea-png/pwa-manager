@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PWA Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --sidebar-bg:#0f172a;--sidebar-text:#94a3b8;--sidebar-hover:#1e293b;--sidebar-active:#6366f1;
+  --accent:#6366f1;--accent-light:#eef2ff;--accent-dark:#4f46e5;
+  --bg:#f8fafc;--card:#ffffff;--border:#e2e8f0;
+  --text:#111827;--text-soft:#6b7280;--text-muted:#9ca3af;
+  --success:#10b981;--error:#ef4444;--warn:#f59e0b;
+  --radius:12px;--radius-sm:8px;--radius-lg:16px;
+  --shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.05);
+  --shadow-md:0 4px 16px rgba(0,0,0,.1);
+  --shadow-lg:0 8px 32px rgba(0,0,0,.14);
+}
+html,body{height:100%;font-family:'Inter',sans-serif;font-size:14px;color:var(--text);background:var(--bg)}
+
+/* ── LOGIN ── */
+#login-page{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 100%)}
+.login-card{background:white;border-radius:20px;padding:40px;width:100%;max-width:400px;box-shadow:0 24px 64px rgba(0,0,0,.3)}
+.login-logo{display:flex;align-items:center;gap:12px;margin-bottom:32px;justify-content:center}
+.login-logo .logo-icon{width:44px;height:44px;background:var(--accent);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px}
+.login-logo span{font-size:22px;font-weight:800;color:#111}
+.login-card h1{font-size:24px;font-weight:700;margin-bottom:6px;color:#111}
+.login-card p{color:var(--text-soft);margin-bottom:28px;font-size:14px}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:13px;font-weight:500;color:#374151;margin-bottom:6px}
+.field input{width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:inherit;outline:none;transition:border-color .2s}
+.field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(99,102,241,.15)}
+.btn-primary{background:var(--accent);color:white;border:none;border-radius:var(--radius-sm);padding:12px 20px;font-size:14px;font-weight:600;cursor:pointer;width:100%;transition:background .2s;font-family:inherit}
+.btn-primary:hover{background:var(--accent-dark)}
+.btn-primary:disabled{opacity:.6;cursor:default}
+#login-error{color:var(--error);font-size:13px;margin-top:10px;text-align:center;display:none}
+
+/* ── LAYOUT ── */
+#app{display:none;height:100vh;overflow:hidden}
+.layout{display:flex;height:100%}
+.sidebar{width:240px;flex-shrink:0;background:var(--sidebar-bg);display:flex;flex-direction:column;height:100%;overflow-y:auto}
+.main{flex:1;overflow-y:auto;background:var(--bg)}
+
+/* ── SIDEBAR ── */
+.sidebar-logo{padding:20px 20px 8px;display:flex;align-items:center;gap:10px}
+.sidebar-logo .logo-icon{width:36px;height:36px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.sidebar-logo span{font-size:16px;font-weight:800;color:white;letter-spacing:-.02em}
+.sidebar-section{padding:16px 12px 4px;font-size:11px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.07em}
+.sidebar-nav{padding:0 8px;flex:1}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);cursor:pointer;color:var(--sidebar-text);transition:all .15s;margin-bottom:2px;font-size:13.5px;font-weight:500;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:var(--sidebar-hover);color:#e2e8f0}
+.nav-item.active{background:rgba(99,102,241,.18);color:var(--accent)}
+.nav-item .icon{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+.sidebar-footer{padding:12px 8px 20px;border-top:1px solid rgba(255,255,255,.06);margin-top:auto}
+.user-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm)}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:white;flex-shrink:0}
+.user-info{flex:1;min-width:0}
+.user-name{font-size:13px;font-weight:600;color:#e2e8f0}
+.btn-logout{background:none;border:none;color:#64748b;cursor:pointer;font-size:12px;padding:4px 8px;border-radius:6px;transition:color .2s;font-family:inherit}
+.btn-logout:hover{color:#94a3b8}
+
+/* ── TOPBAR ── */
+.topbar{padding:20px 28px 0;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.topbar h1{font-size:22px;font-weight:800;color:var(--text)}
+.topbar-actions{display:flex;gap:10px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:var(--radius-sm);font-size:13.5px;font-weight:600;cursor:pointer;border:none;font-family:inherit;transition:all .15s}
+.btn-sm{padding:7px 12px;font-size:12.5px}
+.btn-accent{background:var(--accent);color:white}
+.btn-accent:hover{background:var(--accent-dark)}
+.btn-ghost{background:transparent;color:var(--text-soft);border:1.5px solid var(--border)}
+.btn-ghost:hover{background:#f1f5f9;border-color:#cbd5e1}
+.btn-danger{background:#fee2e2;color:var(--error);border:none}
+.btn-danger:hover{background:#fecaca}
+
+/* ── VIEWS ── */
+.view{padding:20px 28px 40px;display:none}
+.view.active{display:block}
+
+/* ── STATS GRID ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow)}
+.stat-label{font-size:12px;font-weight:600;color:var(--text-soft);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.stat-value{font-size:32px;font-weight:800;color:var(--text);line-height:1}
+.stat-sub{font-size:12px;color:var(--text-muted);margin-top:4px}
+
+/* ── APP GRID ── */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.section-header h2{font-size:16px;font-weight:700}
+.section-header .section-count{background:#f1f5f9;color:var(--text-soft);font-size:12px;font-weight:600;padding:2px 8px;border-radius:20px}
+.apps-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.app-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;cursor:pointer;transition:all .2s;box-shadow:var(--shadow);position:relative}
+.app-card:hover{box-shadow:var(--shadow-md);border-color:#c7d2fe;transform:translateY(-1px)}
+.app-card-header{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.app-icon-wrap{width:54px;height:54px;border-radius:14px;overflow:hidden;flex-shrink:0;background:var(--accent-light);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:var(--accent)}
+.app-icon-wrap img{width:100%;height:100%;object-fit:cover}
+.app-card-meta{flex:1;min-width:0}
+.app-card-name{font-size:15px;font-weight:700;color:var(--text);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.app-card-url{font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.app-card-stats{display:flex;gap:16px;padding-top:14px;border-top:1px solid var(--border)}
+.app-stat{display:flex;flex-direction:column;gap:2px}
+.app-stat-value{font-size:18px;font-weight:700;color:var(--text)}
+.app-stat-label{font-size:11px;font-weight:500;color:var(--text-muted)}
+.app-card-actions{position:absolute;top:14px;right:14px;display:flex;gap:6px;opacity:0;transition:opacity .15s}
+.app-card:hover .app-card-actions{opacity:1}
+.icon-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all .15s}
+.icon-btn:hover{background:#f1f5f9;border-color:#cbd5e1}
+.icon-btn.danger:hover{background:#fee2e2;border-color:#fca5a5;color:var(--error)}
+
+/* ── EMPTY STATE ── */
+.empty-state{text-align:center;padding:60px 20px;color:var(--text-soft)}
+.empty-state .empty-icon{font-size:48px;margin-bottom:16px;opacity:.5}
+.empty-state h3{font-size:16px;font-weight:600;margin-bottom:8px;color:var(--text)}
+.empty-state p{font-size:14px;margin-bottom:20px}
+
+/* ── APP DETAIL ── */
+.breadcrumb{display:flex;align-items:center;gap:8px;margin-bottom:20px;font-size:13px;color:var(--text-soft)}
+.breadcrumb a{color:var(--text-soft);text-decoration:none;cursor:pointer}
+.breadcrumb a:hover{color:var(--accent)}
+.breadcrumb span{color:var(--text)}
+.app-header{display:flex;align-items:center;gap:18px;margin-bottom:24px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow)}
+.app-header-icon{width:64px;height:64px;border-radius:16px;overflow:hidden;flex-shrink:0;background:var(--accent-light);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:var(--accent)}
+.app-header-icon img{width:100%;height:100%;object-fit:cover}
+.app-header-info{flex:1}
+.app-header-name{font-size:20px;font-weight:800;margin-bottom:2px}
+.app-header-url{font-size:13px;color:var(--text-muted)}
+.app-header-slug{display:inline-block;background:#f1f5f9;color:var(--text-soft);font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;margin-top:4px;font-family:monospace}
+
+/* ── TABS ── */
+.tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px}
+.tab{padding:10px 18px;font-size:13.5px;font-weight:600;color:var(--text-soft);cursor:pointer;border:none;background:none;font-family:inherit;position:relative;transition:color .15s;border-bottom:2px solid transparent;margin-bottom:-2px}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* ── CARDS ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:16px}
+.card-title{font-size:14px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card-title .badge{font-size:11px;background:var(--accent-light);color:var(--accent);padding:2px 8px;border-radius:20px;font-weight:600}
+
+/* ── CODE SNIPPET ── */
+.snippet-wrap{position:relative;margin-bottom:12px}
+.snippet-label{font-size:12px;font-weight:600;color:var(--text-soft);margin-bottom:6px}
+.snippet{background:#0f172a;border-radius:var(--radius-sm);padding:14px 16px;font-family:'Courier New',monospace;font-size:12.5px;color:#e2e8f0;white-space:pre;overflow-x:auto;line-height:1.6}
+.copy-btn{position:absolute;top:8px;right:8px;background:rgba(255,255,255,.12);color:#e2e8f0;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit;transition:background .15s}
+.copy-btn:hover{background:rgba(255,255,255,.22)}
+.copy-btn.copied{background:rgba(16,185,129,.3);color:#6ee7b7}
+
+/* ── FORMS ── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-grid.single{grid-template-columns:1fr}
+.form-group{display:flex;flex-direction:column;gap:6px}
+.form-group.full{grid-column:1/-1}
+.form-group label{font-size:13px;font-weight:500;color:#374151}
+.form-group input,.form-group select,.form-group textarea{padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13.5px;font-family:inherit;outline:none;transition:border-color .2s;background:white;color:var(--text)}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(99,102,241,.12)}
+.form-group textarea{resize:vertical;min-height:80px;line-height:1.5}
+.form-group input[type="color"]{padding:4px 6px;height:38px;cursor:pointer}
+.form-hint{font-size:11.5px;color:var(--text-muted)}
+.form-actions{display:flex;gap:10px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}
+
+/* ── TABLE ── */
+.table-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead tr{background:#f8fafc;border-bottom:1px solid var(--border)}
+th{padding:10px 14px;text-align:left;font-size:12px;font-weight:600;color:var(--text-soft);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+td{padding:11px 14px;border-bottom:1px solid #f1f5f9;color:var(--text);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:#fafafa}
+.platform-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.platform-ios{background:#fef3c7;color:#92400e}
+.platform-android{background:#d1fae5;color:#065f46}
+.platform-desktop{background:#ede9fe;color:#4c1d95}
+.platform-unknown{background:#f1f5f9;color:#64748b}
+.truncate{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace;font-size:11px;color:var(--text-soft)}
+
+/* ── PUSH FORM ── */
+.push-preview{background:#0f172a;border-radius:var(--radius);padding:16px;margin-bottom:16px}
+.push-preview-title{font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px}
+.push-notif{background:#1e293b;border-radius:var(--radius-sm);padding:12px 14px;display:flex;gap:12px;align-items:flex-start}
+.push-notif-icon{width:36px;height:36px;border-radius:8px;background:var(--accent);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;overflow:hidden}
+.push-notif-icon img{width:100%;height:100%;object-fit:cover}
+.push-notif-body{flex:1}
+.push-notif-title{font-size:13px;font-weight:700;color:white;margin-bottom:3px}
+.push-notif-body-text{font-size:12px;color:#94a3b8;line-height:1.4}
+
+/* ── ICON UPLOAD ── */
+.icon-upload-area{border:2px dashed var(--border);border-radius:var(--radius);padding:28px;text-align:center;cursor:pointer;transition:all .2s;background:#fafafa}
+.icon-upload-area:hover{border-color:var(--accent);background:var(--accent-light)}
+.icon-upload-area input{display:none}
+.icon-preview{width:72px;height:72px;border-radius:16px;object-fit:cover;margin:0 auto 10px;display:block}
+.icon-upload-text{font-size:13px;color:var(--text-soft)}
+.icon-upload-text strong{color:var(--accent)}
+
+/* ── DANGER ZONE ── */
+.danger-zone{border:1px solid #fecaca;border-radius:var(--radius);padding:16px;background:#fff5f5}
+.danger-zone-title{font-size:13px;font-weight:700;color:var(--error);margin-bottom:8px}
+.danger-zone p{font-size:13px;color:#7f1d1d;margin-bottom:14px}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;display:none}
+.modal-overlay.open{display:flex}
+.modal{background:white;border-radius:var(--radius-lg);padding:28px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
+.modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.modal-header h2{font-size:18px;font-weight:800}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-soft);padding:4px;line-height:1}
+.modal-close:hover{color:var(--text)}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:22px;padding-top:18px;border-top:1px solid var(--border)}
+
+/* ── INSTALL LINK ── */
+.install-link-box{display:flex;align-items:center;gap:8px;background:#f8fafc;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:12px}
+.install-link-url{flex:1;font-size:13px;color:var(--text);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#111;color:white;padding:12px 20px;border-radius:10px;font-size:13.5px;font-weight:500;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;display:flex;align-items:center;gap:8px}
+#toast.show{opacity:1}
+#toast.success::before{content:'✓';color:#6ee7b7}
+#toast.error::before{content:'✕';color:#fca5a5}
+
+/* ── RESPONSIVE ── */
+@media(max-width:768px){
+  .sidebar{width:200px}
+  .view{padding:16px}
+  .apps-grid{grid-template-columns:1fr}
+  .form-grid{grid-template-columns:1fr}
+  .stats-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-page">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-icon">⚡</div>
+      <span>PWA Manager</span>
+    </div>
+    <h1>Bentornato</h1>
+    <p>Accedi al tuo pannello di gestione PWA</p>
+    <form id="login-form">
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="login-password" placeholder="••••••••" required autofocus>
+      </div>
+      <button type="submit" class="btn-primary" id="login-btn">Accedi →</button>
+      <div id="login-error">Password errata. Riprova.</div>
+    </form>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon">⚡</div>
+        <span>PWA Manager</span>
+      </div>
+      <div class="sidebar-section">Menu</div>
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-view="dashboard">
+          <span class="icon">🏠</span> Dashboard
+        </button>
+        <button class="nav-item" data-view="apps">
+          <span class="icon">📱</span> Le tue App
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-row">
+          <div class="avatar">A</div>
+          <div class="user-info">
+            <div class="user-name">Admin</div>
+          </div>
+        </div>
+        <button class="btn-logout" id="logout-btn" style="margin-left:42px">Esci →</button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+
+      <!-- DASHBOARD VIEW -->
+      <div class="view active" id="view-dashboard">
+        <div class="topbar">
+          <h1>Dashboard</h1>
+        </div>
+        <div class="view" style="display:block;padding-top:20px" id="dash-content">
+          <div class="stats-grid" id="dash-stats"></div>
+          <div class="section-header">
+            <h2>Le tue App</h2>
+            <button class="btn btn-accent btn-sm" onclick="showAddModal()">+ Nuova App</button>
+          </div>
+          <div class="apps-grid" id="dash-apps"></div>
+        </div>
+      </div>
+
+      <!-- APPS VIEW -->
+      <div class="view" id="view-apps">
+        <div class="topbar">
+          <h1>Le tue App</h1>
+          <div class="topbar-actions">
+            <button class="btn btn-accent" onclick="showAddModal()">+ Nuova App</button>
+          </div>
+        </div>
+        <div style="padding:20px 28px 0">
+          <div id="apps-list" class="apps-grid"></div>
+        </div>
+      </div>
+
+      <!-- APP DETAIL VIEW -->
+      <div class="view" id="view-app-detail">
+        <div class="topbar">
+          <div class="breadcrumb">
+            <a onclick="navigate('apps')">Le tue App</a>
+            <span>›</span>
+            <span id="detail-breadcrumb">App</span>
+          </div>
+        </div>
+        <div style="padding:0 28px 40px">
+          <div class="app-header" id="detail-header"></div>
+          <div class="tabs">
+            <button class="tab active" data-tab="overview">Panoramica</button>
+            <button class="tab" data-tab="install">Installazione</button>
+            <button class="tab" data-tab="push">Notifiche Push</button>
+            <button class="tab" data-tab="subscribers">Iscritti</button>
+            <button class="tab" data-tab="settings">Impostazioni</button>
+          </div>
+          <div id="tab-overview"></div>
+          <div id="tab-install" style="display:none"></div>
+          <div id="tab-push" style="display:none"></div>
+          <div id="tab-subscribers" style="display:none"></div>
+          <div id="tab-settings" style="display:none"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- MODAL: ADD APP -->
+<div class="modal-overlay" id="modal-add">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Nuova App PWA</h2>
+      <button class="modal-close" onclick="closeModal('modal-add')">×</button>
+    </div>
+    <form id="form-add-app">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Nome App *</label>
+          <input type="text" name="name" placeholder="Es. Oltre il Velo" required>
+        </div>
+        <div class="form-group">
+          <label>Slug * <span class="form-hint">(solo a-z, 0-9, -)</span></label>
+          <input type="text" name="slug" placeholder="oltre-il-velo" required pattern="[a-z0-9-]+">
+        </div>
+        <div class="form-group full">
+          <label>URL sito</label>
+          <input type="url" name="site_url" placeholder="https://tuosito.com">
+        </div>
+        <div class="form-group full">
+          <label>Descrizione</label>
+          <textarea name="description" placeholder="Breve descrizione della tua app..." rows="2"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Colore di sfondo</label>
+          <input type="color" name="bg_color" value="#ffffff">
+        </div>
+        <div class="form-group">
+          <label>Colore tema</label>
+          <input type="color" name="theme_color" value="#6366f1">
+        </div>
+        <div class="form-group full">
+          <label>Modalità display</label>
+          <select name="display">
+            <option value="standalone">Standalone (consigliato — nessuna barra browser)</option>
+            <option value="fullscreen">Fullscreen</option>
+            <option value="minimal-ui">Minimal UI</option>
+            <option value="browser">Browser</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modal-add')">Annulla</button>
+        <button type="submit" class="btn btn-accent">Crea App →</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL: CONFIRM DELETE -->
+<div class="modal-overlay" id="modal-delete">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <h2>Elimina App</h2>
+      <button class="modal-close" onclick="closeModal('modal-delete')">×</button>
+    </div>
+    <p style="color:var(--text-soft);margin-bottom:8px">Sei sicuro? Questa azione elimina l'app, tutti gli iscritti e la cronologia notifiche. Non è reversibile.</p>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-delete')">Annulla</button>
+      <button class="btn btn-danger" id="confirm-delete-btn">Elimina definitivamente</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let state = { apps: [], currentApp: null, currentTab: 'overview' };
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+async function init() {
+  const res = await api('/auth/me');
+  if (res.admin) {
+    showApp();
+  } else {
+    document.getElementById('login-page').style.display = 'flex';
+  }
+}
+
+function showApp() {
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  navigate('dashboard');
+  loadApps();
+}
+
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('login-error');
+  const password = document.getElementById('login-password').value;
+  btn.disabled = true; btn.textContent = 'Accesso...';
+  err.style.display = 'none';
+  const res = await api('/auth/login', 'POST', { password });
+  if (res.ok) {
+    showApp();
+  } else {
+    err.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Accedi →';
+  }
+});
+
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  await api('/auth/logout', 'POST');
+  location.reload();
+});
+
+// ─── NAVIGATION ───────────────────────────────────────────────────────────────
+function navigate(view, params) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const viewEl = document.getElementById('view-' + view);
+  if (viewEl) viewEl.classList.add('active');
+  const navEl = document.querySelector(`[data-view="${view}"]`);
+  if (navEl) navEl.classList.add('active');
+
+  if (view === 'dashboard') renderDashboard();
+  if (view === 'apps') renderAppsList();
+  if (view === 'app-detail' && params) {
+    state.currentApp = params;
+    renderAppDetail(params);
+  }
+}
+
+document.querySelectorAll('[data-view]').forEach(btn => {
+  btn.addEventListener('click', () => navigate(btn.dataset.view));
+});
+
+// ─── LOAD DATA ────────────────────────────────────────────────────────────────
+async function loadApps() {
+  state.apps = await api('/apps') || [];
+  renderDashboard();
+  renderAppsList();
+}
+
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
+function renderDashboard() {
+  const totalSubs = state.apps.reduce((s, a) => s + (a.sub_count || 0), 0);
+  const totalNotifs = state.apps.reduce((s, a) => s + (a.notif_count || 0), 0);
+  document.getElementById('dash-stats').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">📱 App PWA</div>
+      <div class="stat-value">${state.apps.length}</div>
+      <div class="stat-sub">app registrate</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">🔔 Iscritti totali</div>
+      <div class="stat-value">${totalSubs}</div>
+      <div class="stat-sub">in tutte le app</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">✉️ Notifiche inviate</div>
+      <div class="stat-value">${totalNotifs}</div>
+      <div class="stat-sub">campagne totali</div>
+    </div>`;
+
+  const el = document.getElementById('dash-apps');
+  if (!state.apps.length) {
+    el.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+      <div class="empty-icon">📱</div>
+      <h3>Nessuna app ancora</h3>
+      <p>Crea la tua prima app PWA e inizia a gestire installazioni e notifiche.</p>
+      <button class="btn btn-accent" onclick="showAddModal()">+ Crea prima App</button>
+    </div>`;
+  } else {
+    el.innerHTML = state.apps.map(a => appCardHTML(a)).join('');
+  }
+}
+
+// ─── APPS LIST ────────────────────────────────────────────────────────────────
+function renderAppsList() {
+  const el = document.getElementById('apps-list');
+  if (!state.apps.length) {
+    el.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+      <div class="empty-icon">📱</div>
+      <h3>Nessuna app ancora</h3>
+      <p>Aggiungi la tua prima app PWA per iniziare.</p>
+      <button class="btn btn-accent" onclick="showAddModal()">+ Crea prima App</button>
+    </div>`;
+  } else {
+    el.innerHTML = state.apps.map(a => appCardHTML(a)).join('');
+  }
+}
+
+function appCardHTML(a) {
+  const iconHTML = a.icon_path
+    ? `<img src="${a.icon_path}?v=${Date.now()}" alt="">`
+    : `<span>${(a.name||'?')[0]}</span>`;
+  return `<div class="app-card" onclick="openApp(${a.id})">
+    <div class="app-card-actions">
+      <button class="icon-btn" onclick="event.stopPropagation();openApp(${a.id})" title="Apri">✏️</button>
+      <button class="icon-btn danger" onclick="event.stopPropagation();confirmDelete(${a.id},'${escHtml(a.name)}')" title="Elimina">🗑️</button>
+    </div>
+    <div class="app-card-header">
+      <div class="app-icon-wrap">${iconHTML}</div>
+      <div class="app-card-meta">
+        <div class="app-card-name">${escHtml(a.name)}</div>
+        <div class="app-card-url">${a.site_url ? escHtml(a.site_url) : '—'}</div>
+      </div>
+    </div>
+    <div class="app-card-stats">
+      <div class="app-stat"><div class="app-stat-value">${a.sub_count||0}</div><div class="app-stat-label">Iscritti</div></div>
+      <div class="app-stat"><div class="app-stat-value">${a.notif_count||0}</div><div class="app-stat-label">Notifiche</div></div>
+    </div>
+  </div>`;
+}
+
+// ─── APP DETAIL ───────────────────────────────────────────────────────────────
+async function openApp(id) {
+  const app = await api(`/apps/${id}`);
+  state.currentApp = app;
+  state.currentTab = 'overview';
+  document.getElementById('view-dashboard').classList.remove('active');
+  document.getElementById('view-apps').classList.remove('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  navigate('app-detail', app);
+}
+
+function renderAppDetail(app) {
+  document.getElementById('detail-breadcrumb').textContent = app.name;
+  const iconHTML = app.icon_path
+    ? `<img src="${app.icon_path}?v=${Date.now()}" alt="">`
+    : `<span>${(app.name||'?')[0]}</span>`;
+  document.getElementById('detail-header').innerHTML = `
+    <div class="app-header-icon">${iconHTML}</div>
+    <div class="app-header-info">
+      <div class="app-header-name">${escHtml(app.name)}</div>
+      <div class="app-header-url">${app.site_url ? escHtml(app.site_url) : 'Nessun URL configurato'}</div>
+      <div class="app-header-slug">slug: ${app.slug}</div>
+    </div>
+    <div style="display:flex;gap:8px;margin-left:auto">
+      <a href="${getBase()}/${app.slug}/install" target="_blank" class="btn btn-ghost btn-sm">🔗 Pagina installazione</a>
+    </div>`;
+
+  document.querySelectorAll('.tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.tab === 'overview');
+  });
+  switchTab('overview');
+}
+
+function switchTab(tab) {
+  state.currentTab = tab;
+  ['overview','install','push','subscribers','settings'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.tab === tab);
+  });
+  const app = state.currentApp;
+  if (tab === 'overview') renderTabOverview(app);
+  else if (tab === 'install') renderTabInstall(app);
+  else if (tab === 'push') renderTabPush(app);
+  else if (tab === 'subscribers') renderTabSubscribers(app);
+  else if (tab === 'settings') renderTabSettings(app);
+}
+
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => switchTab(t.dataset.tab));
+});
+
+// ─── TAB: OVERVIEW ───────────────────────────────────────────────────────────
+function renderTabOverview(app) {
+  document.getElementById('tab-overview').innerHTML = `
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">🔔 Iscritti totali</div>
+        <div class="stat-value">${app.sub_count||0}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">🍎 iOS</div>
+        <div class="stat-value">${app.ios_count||0}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">🤖 Android</div>
+        <div class="stat-value">${app.android_count||0}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">💻 Desktop</div>
+        <div class="stat-value">${app.desktop_count||0}</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">🚀 Azioni rapide</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <a href="${getBase()}/${app.slug}/install" target="_blank" class="btn btn-ghost">🔗 Apri pagina installazione</a>
+        <button class="btn btn-accent" onclick="switchTab('push')">📣 Invia notifica</button>
+        <button class="btn btn-ghost" onclick="switchTab('install')">📋 Snippet installazione</button>
+      </div>
+    </div>`;
+}
+
+// ─── TAB: INSTALL ─────────────────────────────────────────────────────────────
+function renderTabInstall(app) {
+  const base = getBase();
+  const installUrl = `${base}/${app.slug}/install`;
+  const snippet1 = `<!-- Aggiungi nel <head> del tuo sito -->
+<link rel="manifest" href="${base}/${app.slug}/manifest.json" crossorigin="use-credentials">
+<meta name="theme-color" content="${app.theme_color}">
+<script src="${base}/${app.slug}/init.js" defer><\/script>`;
+  const snippet2 = `// Salva questo file come /sw.js nella root del tuo sito
+importScripts('${base}/${app.slug}/sw-core.js');`;
+
+  document.getElementById('tab-install').innerHTML = `
+    <div class="card">
+      <div class="card-title">🔗 Pagina di installazione</div>
+      <p style="font-size:13px;color:var(--text-soft);margin-bottom:12px">Condividi questo link con i tuoi utenti per installare l'app sul telefono e attivare le notifiche.</p>
+      <div class="install-link-box">
+        <span class="install-link-url">${installUrl}</span>
+        <button class="btn btn-ghost btn-sm" onclick="copyText('${installUrl}',this)">Copia</button>
+        <a href="${installUrl}" target="_blank" class="btn btn-accent btn-sm">Apri →</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📋 Step 1 — Aggiungi snippet HTML <span class="badge">nel &lt;head&gt;</span></div>
+      <p style="font-size:13px;color:var(--text-soft);margin-bottom:12px">Incolla questo codice nell'elemento <code>&lt;head&gt;</code> di ogni pagina del tuo sito.</p>
+      <div class="snippet-wrap">
+        <div class="snippet">${escHtml(snippet1)}</div>
+        <button class="copy-btn" onclick="copyText(\`${escHtml(snippet1).replace(/`/g,'\\`')}\`,this)">Copia</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📋 Step 2 — Service Worker <span class="badge">una sola volta</span></div>
+      <p style="font-size:13px;color:var(--text-soft);margin-bottom:12px">Crea un file <code>sw.js</code> nella <strong>root</strong> del tuo sito con questo contenuto. Va fatto una sola volta per sito.</p>
+      <div class="snippet-wrap">
+        <div class="snippet">${escHtml(snippet2)}</div>
+        <button class="copy-btn" onclick="copyText(\`${escHtml(snippet2).replace(/`/g,'\\`')}\`,this)">Copia</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🔑 Chiave VAPID pubblica</div>
+      <div class="snippet-wrap">
+        <div class="snippet">${app.vapid_public}</div>
+        <button class="copy-btn" onclick="copyText('${app.vapid_public}',this)">Copia</button>
+      </div>
+    </div>`;
+}
+
+// ─── TAB: PUSH ────────────────────────────────────────────────────────────────
+async function renderTabPush(app) {
+  const notifs = await api(`/apps/${app.id}/notifications`) || [];
+  const iconSrc = app.icon_path ? app.icon_path : '';
+
+  document.getElementById('tab-push').innerHTML = `
+    <div class="card">
+      <div class="card-title">📣 Invia notifica push</div>
+      <div class="push-preview">
+        <div class="push-preview-title">Anteprima</div>
+        <div class="push-notif">
+          <div class="push-notif-icon" id="notif-prev-icon">
+            ${iconSrc ? `<img src="${iconSrc}" alt="">` : '📱'}
+          </div>
+          <div class="push-notif-body">
+            <div class="push-notif-title" id="notif-prev-title">Titolo notifica</div>
+            <div class="push-notif-body-text" id="notif-prev-body">Testo del messaggio...</div>
+          </div>
+        </div>
+      </div>
+      <form id="push-form">
+        <div class="form-grid">
+          <div class="form-group full">
+            <label>Titolo *</label>
+            <input type="text" name="title" placeholder="Titolo della notifica" required oninput="document.getElementById('notif-prev-title').textContent=this.value||'Titolo notifica'">
+          </div>
+          <div class="form-group full">
+            <label>Messaggio</label>
+            <textarea name="body" rows="2" placeholder="Testo del messaggio..." oninput="document.getElementById('notif-prev-body').textContent=this.value||'Testo del messaggio...'"></textarea>
+          </div>
+          <div class="form-group">
+            <label>URL azione (al click)</label>
+            <input type="url" name="action_url" placeholder="${app.site_url||'https://tuosito.com'}">
+          </div>
+          <div class="form-group">
+            <label>URL immagine grande (opzionale)</label>
+            <input type="url" name="image_url" placeholder="https://...">
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px">
+          <span style="font-size:13px;color:var(--text-soft)">Destinatari: <strong>${app.sub_count||0} iscritti</strong></span>
+          <button type="submit" class="btn btn-accent" ${!app.sub_count?'disabled title="Nessun iscritto"':''}>
+            📣 Invia a tutti
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📜 Cronologia notifiche</div>
+      ${notifs.length === 0 ? `<p style="color:var(--text-muted);font-size:13px">Nessuna notifica inviata ancora.</p>` : `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Data</th><th>Titolo</th><th>Inviati</th><th>Falliti</th></tr></thead>
+          <tbody>${notifs.map(n => `
+            <tr>
+              <td style="color:var(--text-soft);white-space:nowrap">${fmtDate(n.created_at)}</td>
+              <td><strong>${escHtml(n.title)}</strong>${n.body?`<br><span style="font-size:12px;color:var(--text-soft)">${escHtml(n.body)}</span>`:''}</td>
+              <td><span style="color:var(--success);font-weight:700">${n.sent_count}</span></td>
+              <td><span style="color:${n.failed_count>0?'var(--error)':'var(--text-muted)'}">${n.failed_count}</span></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`}
+    </div>`;
+
+  document.getElementById('push-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('[type=submit]');
+    btn.disabled = true; btn.textContent = 'Invio...';
+    const data = Object.fromEntries(new FormData(e.target));
+    const res = await api(`/apps/${app.id}/notify`, 'POST', data);
+    btn.disabled = false; btn.textContent = '📣 Invia a tutti';
+    if (res.ok) {
+      toast(`✓ Inviato a ${res.sent} iscritti${res.failed?` (${res.failed} falliti)`:''}`, 'success');
+      e.target.reset();
+      document.getElementById('notif-prev-title').textContent = 'Titolo notifica';
+      document.getElementById('notif-prev-body').textContent = 'Testo del messaggio...';
+      renderTabPush(app);
+    } else {
+      toast(res.error || 'Errore invio', 'error');
+    }
+  });
+}
+
+// ─── TAB: SUBSCRIBERS ─────────────────────────────────────────────────────────
+async function renderTabSubscribers(app) {
+  const subs = await api(`/apps/${app.id}/subscribers`) || [];
+  document.getElementById('tab-subscribers').innerHTML = `
+    <div class="card">
+      <div class="card-title">👥 Iscritti <span class="badge">${subs.length}</span></div>
+      ${subs.length === 0 ? `<p style="color:var(--text-muted);font-size:13px">Nessun iscritto ancora. Condividi la pagina di installazione!</p>` : `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Piattaforma</th><th>Data iscrizione</th><th>Endpoint</th><th></th></tr></thead>
+          <tbody>${subs.map(s => `
+            <tr>
+              <td><span class="platform-badge platform-${s.platform}">${platformIcon(s.platform)} ${s.platform}</span></td>
+              <td style="color:var(--text-soft);white-space:nowrap">${fmtDate(s.created_at)}</td>
+              <td><div class="truncate" title="${escHtml(s.endpoint)}">${escHtml(s.endpoint)}</div></td>
+              <td><button class="btn btn-danger btn-sm" onclick="removeSub(${app.id},${s.id})">Rimuovi</button></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`}
+    </div>`;
+}
+
+async function removeSub(appId, subId) {
+  if (!confirm('Rimuovere questo iscritto?')) return;
+  await api(`/apps/${appId}/subscribers/${subId}`, 'DELETE');
+  state.currentApp = await api(`/apps/${appId}`);
+  toast('Iscritto rimosso', 'success');
+  renderTabSubscribers(state.currentApp);
+}
+
+// ─── TAB: SETTINGS ────────────────────────────────────────────────────────────
+function renderTabSettings(app) {
+  document.getElementById('tab-settings').innerHTML = `
+    <div class="card">
+      <div class="card-title">🖼️ Icona App</div>
+      <div class="icon-upload-area" onclick="document.getElementById('icon-file-input').click()">
+        <input type="file" id="icon-file-input" accept="image/*" onchange="uploadIcon(${app.id},this)">
+        ${app.icon_path
+          ? `<img src="${app.icon_path}?v=${Date.now()}" class="icon-preview" alt=""><div class="icon-upload-text">Clicca per cambiare l'icona</div>`
+          : `<div style="font-size:40px;margin-bottom:8px">🖼️</div><div class="icon-upload-text"><strong>Clicca per caricare</strong> un'icona PNG/JPG (min 512×512 consigliato)</div>`}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">⚙️ Impostazioni generali</div>
+      <form id="settings-form">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Nome App</label>
+            <input type="text" name="name" value="${escHtml(app.name)}" required>
+          </div>
+          <div class="form-group">
+            <label>Slug (non modificabile)</label>
+            <input type="text" value="${app.slug}" disabled style="opacity:.5">
+          </div>
+          <div class="form-group full">
+            <label>URL sito</label>
+            <input type="url" name="site_url" value="${escHtml(app.site_url||'')}">
+          </div>
+          <div class="form-group full">
+            <label>Descrizione</label>
+            <textarea name="description" rows="2">${escHtml(app.description||'')}</textarea>
+          </div>
+          <div class="form-group">
+            <label>Colore di sfondo</label>
+            <input type="color" name="bg_color" value="${app.bg_color||'#ffffff'}">
+          </div>
+          <div class="form-group">
+            <label>Colore tema</label>
+            <input type="color" name="theme_color" value="${app.theme_color||'#6366f1'}">
+          </div>
+          <div class="form-group full">
+            <label>Modalità display</label>
+            <select name="display">
+              <option value="standalone" ${app.display==='standalone'?'selected':''}>Standalone</option>
+              <option value="fullscreen" ${app.display==='fullscreen'?'selected':''}>Fullscreen</option>
+              <option value="minimal-ui" ${app.display==='minimal-ui'?'selected':''}>Minimal UI</option>
+              <option value="browser" ${app.display==='browser'?'selected':''}>Browser</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-accent">Salva modifiche</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="danger-zone">
+      <div class="danger-zone-title">⚠️ Zona pericolosa</div>
+      <p>L'eliminazione dell'app rimuove tutti gli iscritti e la cronologia notifiche. Azione irreversibile.</p>
+      <button class="btn btn-danger" onclick="confirmDelete(${app.id},'${escHtml(app.name)}')">🗑️ Elimina questa app</button>
+    </div>`;
+
+  document.getElementById('settings-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('[type=submit]');
+    btn.disabled = true; btn.textContent = 'Salvataggio...';
+    const data = Object.fromEntries(new FormData(e.target));
+    const res = await api(`/apps/${app.id}`, 'PUT', data);
+    btn.disabled = false; btn.textContent = 'Salva modifiche';
+    if (res.id) {
+      state.currentApp = { ...state.currentApp, ...res };
+      await loadApps();
+      toast('Impostazioni salvate!', 'success');
+      document.getElementById('detail-breadcrumb').textContent = res.name;
+      document.getElementById('detail-header').querySelector('.app-header-name').textContent = res.name;
+    } else {
+      toast(res.error || 'Errore salvataggio', 'error');
+    }
+  });
+}
+
+async function uploadIcon(appId, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append('icon', file);
+  const res = await fetch(`/api/apps/${appId}/icon`, { method: 'POST', body: form });
+  const data = await res.json();
+  if (data.icon_path) {
+    toast('Icona aggiornata!', 'success');
+    state.currentApp.icon_path = data.icon_path;
+    await loadApps();
+    renderTabSettings(state.currentApp);
+    renderAppDetail(state.currentApp);
+  } else {
+    toast(data.error || 'Errore upload', 'error');
+  }
+}
+
+// ─── ADD APP MODAL ────────────────────────────────────────────────────────────
+function showAddModal() {
+  document.getElementById('modal-add').classList.add('open');
+  document.querySelector('#form-add-app [name=name]').focus();
+}
+
+// Auto-generate slug from name
+document.querySelector('#form-add-app [name=name]').addEventListener('input', function() {
+  const slugField = document.querySelector('#form-add-app [name=slug]');
+  if (!slugField._touched) {
+    slugField.value = this.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  }
+});
+document.querySelector('#form-add-app [name=slug]').addEventListener('input', function() {
+  this._touched = true;
+});
+
+document.getElementById('form-add-app').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = e.target.querySelector('[type=submit]');
+  btn.disabled = true; btn.textContent = 'Creazione...';
+  const data = Object.fromEntries(new FormData(e.target));
+  const res = await api('/apps', 'POST', data);
+  btn.disabled = false; btn.textContent = 'Crea App →';
+  if (res.id) {
+    closeModal('modal-add');
+    e.target.reset();
+    document.querySelector('#form-add-app [name=slug]')._touched = false;
+    await loadApps();
+    toast('App creata!', 'success');
+    openApp(res.id);
+  } else {
+    toast(res.error || 'Errore creazione', 'error');
+  }
+});
+
+// ─── DELETE ──────────────────────────────────────────────────────────────────
+let deleteTargetId = null;
+function confirmDelete(id, name) {
+  deleteTargetId = id;
+  document.getElementById('modal-delete').classList.add('open');
+}
+document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
+  if (!deleteTargetId) return;
+  await api(`/apps/${deleteTargetId}`, 'DELETE');
+  closeModal('modal-delete');
+  deleteTargetId = null;
+  await loadApps();
+  toast('App eliminata', 'success');
+  navigate('apps');
+});
+
+// ─── MODAL UTILS ─────────────────────────────────────────────────────────────
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', (e) => { if (e.target === el) closeModal(el.id); });
+});
+
+// ─── API ─────────────────────────────────────────────────────────────────────
+async function api(path, method = 'GET', body) {
+  try {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch('/api' + path, opts);
+    return await res.json();
+  } catch (e) {
+    return { error: e.message };
+  }
+}
+
+// ─── UTILS ───────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
+function fmtDate(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts * 1000);
+  return d.toLocaleDateString('it-IT', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
+function platformIcon(p) {
+  return { ios: '🍎', android: '🤖', desktop: '💻' }[p] || '❓';
+}
+
+function getBase() {
+  return window.location.origin;
+}
+
+async function copyText(text, btn) {
+  try {
+    await navigator.clipboard.writeText(text);
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copiato!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 2000);
+  } catch (e) {
+    toast('Impossibile copiare', 'error');
+  }
+}
+
+function toast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show ' + type;
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.className = '', 3000);
+}
+
+// ─── START ───────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
