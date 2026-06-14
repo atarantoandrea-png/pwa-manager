@@ -127,9 +127,6 @@ router.get('/:slug/init.js', (req, res) => {
   var BG = ${JSON.stringify(app.bg_color || '#ffffff')};
   var SITE_URL = ${JSON.stringify(app.site_url || '')};
 
-  // Cattura subito il <script> chiamante per leggere eventuali data-* overrides
-  var __initScript = document.currentScript;
-
   // ─── iOS / PWA: inietta i tag che servono per la modalità standalone ─────────
   // Senza "apple-mobile-web-app-capable" iOS apre l'icona come scorciatoia Safari
   // (con barra indietro/condividi/ricarica). Questo la rende un'app full-screen,
@@ -137,10 +134,12 @@ router.get('/:slug/init.js', (req, res) => {
   (function injectPwaTags() {
     var head = document.head || document.documentElement;
 
-    // Override via data-start-url / data-icon-url sull'elemento <script> chiamante
-    var overrideStartUrl = __initScript && __initScript.getAttribute('data-start-url');
-    var overrideIconUrl  = __initScript && __initScript.getAttribute('data-icon-url');
-    var effectiveIconUrl = overrideIconUrl || ICON_URL;
+    // Override tramite window.__pwaManagerOverride (impostato dall'embed PRIMA che
+    // questo script carichi — document.currentScript è null per script asincroni)
+    var ov = window.__pwaManagerOverride || {};
+    var effectiveIconUrl = ov.iconUrl || ICON_URL;
+    var effectiveName    = ov.appName  || APP_NAME;
+    var overrideStartUrl = ov.startUrl || null;
 
     // Imposta un meta, sostituendo qualsiasi valore già presente (es. da systeme.io)
     function meta(name, content) {
@@ -154,12 +153,12 @@ router.get('/:slug/init.js', (req, res) => {
     meta('apple-mobile-web-app-capable', 'yes');
     meta('mobile-web-app-capable', 'yes');
     meta('apple-mobile-web-app-status-bar-style', 'black-translucent');
-    if (APP_NAME) meta('apple-mobile-web-app-title', APP_NAME);
+    if (effectiveName) meta('apple-mobile-web-app-title', effectiveName);
     if (THEME) meta('theme-color', THEME);
     // Sostituisce apple-touch-icon esistente (systeme.io ne mette uno suo)
     if (effectiveIconUrl) {
-      var existing = document.querySelector('link[rel="apple-touch-icon"]');
-      if (existing) existing.parentNode.removeChild(existing);
+      var existingIcon = document.querySelector('link[rel="apple-touch-icon"]');
+      if (existingIcon) existingIcon.parentNode.removeChild(existingIcon);
       var l = document.createElement('link');
       l.setAttribute('rel', 'apple-touch-icon');
       l.setAttribute('href', effectiveIconUrl);
@@ -173,8 +172,8 @@ router.get('/:slug/init.js', (req, res) => {
       var startUrl = overrideStartUrl ||
         ((SITE_URL && SITE_URL.indexOf(origin) === 0) ? SITE_URL : (origin + '/'));
       var mf = {
-        name: APP_NAME,
-        short_name: APP_NAME,
+        name: effectiveName,
+        short_name: effectiveName,
         start_url: startUrl,
         scope: origin + '/',
         display: 'standalone',
