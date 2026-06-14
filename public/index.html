@@ -652,15 +652,20 @@ function renderTabInstall(app) {
   const snippet2 = `// Salva questo file come /sw.js nella root del tuo sito
 importScripts('${base}/${app.slug}/sw-core.js');`;
 
+  const downloadUrl = `${base}/${app.slug}/install.html`;
   document.getElementById('tab-install').innerHTML = `
     <div class="card">
       <div class="card-title">🔗 Pagina di installazione</div>
-      <p style="font-size:13px;color:var(--text-soft);margin-bottom:12px">Condividi questo link con i tuoi utenti per installare l'app sul telefono e attivare le notifiche.</p>
+      <p style="font-size:13px;color:var(--text-soft);margin-bottom:12px">Condividi questo link oppure scarica la pagina e mettila sul tuo sito — obbligatorio per nascondere la barra Safari su iPhone.</p>
       <div class="install-link-box">
         <span class="install-link-url">${installUrl}</span>
         <button class="btn btn-ghost btn-sm" onclick="copyText('${installUrl}',this)">Copia</button>
         <a href="${installUrl}" target="_blank" class="btn btn-accent btn-sm">Apri →</a>
       </div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <a href="${downloadUrl}" download="install.html" class="btn btn-ghost btn-sm">📥 Scarica install.html</a>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin-top:10px">💡 <strong>iOS:</strong> per nascondere la barra di Safari dopo l'installazione, carica <code>install.html</code> sul tuo sito come <code>/install</code> e aggiungi <code>/sw.js</code> nella root. Poi imposta <em>Site URL</em> nelle impostazioni app.</p>
     </div>
 
     <div class="card">

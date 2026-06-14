@@ -306,21 +306,14 @@ router.get('/:slug/vapid-public', (req, res) => {
 
 // ─── INSTALL PAGE ─────────────────────────────────────────────────────────────
 
-router.get('/:slug/install', (req, res) => {
-  const app = getApp(req.params.slug);
-  if (!app) return res.status(404).send('App not found');
-
-  // Nota: NON reindirizziamo a {site_url}/install perché quella pagina potrebbe non esistere.
-  // La pagina install è servita direttamente dal PWA Manager.
-  // In standalone mode (app già installata), il JavaScript nella pagina fa redirect a site_url.
-
-  const base = BASE_URL();
+// Genera l'HTML della pagina install (riusato da /:slug/install e /:slug/install.html)
+function buildInstallHtml(app, base) {
   const iconUrl = app.icon_path ? base + app.icon_path : '';
   const siteUrl = app.site_url || '';
   const subCount = db.prepare('SELECT COUNT(*) as n FROM subscriptions WHERE app_id = ?').get(app.id).n;
-
-  res.setHeader('Content-Type', 'text/html');
-  res.send(`<!DOCTYPE html>
+  const accent = app.theme_color || '#6366f1';
+  const bg = app.bg_color || '#ffffff';
+  return `<!DOCTYPE html>` + `
 <html lang="it">
 <head>
 <meta charset="UTF-8">
@@ -335,142 +328,127 @@ router.get('/:slug/install', (req, res) => {
 })();
 </script>
 <link rel="manifest" href="${base}/${app.slug}/manifest.json" crossorigin="use-credentials">
-<meta name="theme-color" content="${app.theme_color || '#6366f1'}">
-<script src="${base}/${app.slug}/init.js" defer></script>
+<meta name="theme-color" content="${accent}">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="${app.name}">
+${iconUrl ? `<link rel="apple-touch-icon" href="${iconUrl}">` : ''}
+<script src="${base}/${app.slug}/init.js" defer><\/script>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --accent: ${app.theme_color || '#6366f1'};
-    --bg: ${app.bg_color || '#ffffff'};
-  }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f0f5; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-  .card { background: white; border-radius: 24px; padding: 40px 32px; max-width: 400px; width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.12); }
-  .app-icon { width: 100px; height: 100px; border-radius: 22px; margin: 0 auto 20px; object-fit: cover; background: var(--accent); display: flex; align-items: center; justify-content: center; overflow: hidden; }
-  .app-icon img { width: 100%; height: 100%; object-fit: cover; }
-  .app-icon-placeholder { font-size: 48px; color: white; font-weight: 700; }
-  h1 { font-size: 24px; font-weight: 700; color: #111; margin-bottom: 8px; }
-  .desc { font-size: 15px; color: #666; margin-bottom: 8px; line-height: 1.5; }
-  .sub-count { font-size: 13px; color: #999; margin-bottom: 28px; }
-  .btn { display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: white; border: none; border-radius: 14px; padding: 14px 28px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%; justify-content: center; transition: opacity .2s; }
-  .btn:hover { opacity: .88; }
-  .btn:disabled { opacity: .5; cursor: default; }
-  .btn-outline { background: transparent; color: var(--accent); border: 2px solid var(--accent); margin-top: 10px; }
-  .divider { height: 1px; background: #eee; margin: 24px 0; }
-  .steps { text-align: left; }
-  .steps h3 { font-size: 13px; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 14px; }
-  .step { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
-  .step-num { width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: white; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
-  .step p { font-size: 14px; color: #444; line-height: 1.5; }
-  .step p strong { color: #111; }
-  .notif-btn { margin-top: 16px; background: white; color: var(--accent); border: 2px solid var(--accent); border-radius: 14px; padding: 13px 28px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all .2s; }
-  .notif-btn:hover { background: var(--accent); color: white; }
-  .success-badge { display: inline-flex; align-items: center; gap: 6px; background: #d1fae5; color: #065f46; border-radius: 8px; padding: 8px 16px; font-size: 14px; font-weight: 600; margin-top: 12px; }
-  .platform-ios .android-only { display: none; }
-  .platform-android .ios-only { display: none; }
-  footer { margin-top: 24px; font-size: 12px; color: #aaa; }
-  footer a { color: #aaa; text-decoration: none; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--accent:${accent};--bg:${bg}}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f0f5;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+.card{background:white;border-radius:24px;padding:40px 32px;max-width:400px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.12)}
+.app-icon{width:100px;height:100px;border-radius:22px;margin:0 auto 20px;object-fit:cover;background:var(--accent);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.app-icon img{width:100%;height:100%;object-fit:cover}
+.icon-placeholder{font-size:48px;color:white;font-weight:700}
+h1{font-size:24px;font-weight:700;color:#111;margin-bottom:8px}
+.desc{font-size:15px;color:#666;margin-bottom:8px;line-height:1.5}
+.sub-count{font-size:13px;color:#999;margin-bottom:28px}
+.btn{display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:white;border:none;border-radius:14px;padding:14px 28px;font-size:16px;font-weight:600;cursor:pointer;width:100%;justify-content:center;transition:opacity .2s}
+.btn:hover{opacity:.88}.btn:disabled{opacity:.5;cursor:default}
+.divider{height:1px;background:#eee;margin:24px 0}
+.steps{text-align:left}
+.steps h3{font-size:13px;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px}
+.step{display:flex;gap:12px;align-items:flex-start;margin-bottom:14px}
+.step-num{width:24px;height:24px;border-radius:50%;background:var(--accent);color:white;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.step p{font-size:14px;color:#444;line-height:1.5}
+.step p strong{color:#111}
+.notif-btn{margin-top:16px;background:white;color:var(--accent);border:2px solid var(--accent);border-radius:14px;padding:13px 28px;font-size:15px;font-weight:600;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s}
+.notif-btn:hover{background:var(--accent);color:white}
+.success-badge{display:inline-flex;align-items:center;gap:6px;background:#d1fae5;color:#065f46;border-radius:8px;padding:8px 16px;font-size:14px;font-weight:600;margin-top:12px}
+footer{margin-top:24px;font-size:12px;color:#aaa}
 </style>
 </head>
 <body>
 <div class="card">
   <div class="app-icon">
-    ${iconUrl ? `<img src="${iconUrl}" alt="${app.name}">` : `<div class="app-icon-placeholder">${app.name[0]}</div>`}
+    ${iconUrl ? `<img src="${iconUrl}" alt="${app.name}">` : `<div class="icon-placeholder">${app.name[0]}</div>`}
   </div>
   <h1>${app.name}</h1>
   ${app.description ? `<p class="desc">${app.description}</p>` : ''}
   ${subCount > 0 ? `<p class="sub-count">Unisciti a ${subCount.toLocaleString()} ${subCount === 1 ? 'persona' : 'persone'} che hanno già installato l'app</p>` : ''}
 
-  <div id="ios-instructions" class="steps ios-only" style="display:none">
-    <h3>Come installare su iPhone / iPad</h3>
-    <div class="step"><div class="step-num">1</div><p>Tocca il pulsante <strong>Condividi</strong> nella barra in basso di Safari</p></div>
+  <div id="ios-steps" class="steps" style="display:none">
+    <h3>Installa su iPhone / iPad</h3>
+    <div class="step"><div class="step-num">1</div><p>Tocca il pulsante <strong>Condividi</strong> nella barra di Safari</p></div>
     <div class="step"><div class="step-num">2</div><p>Scorri e tocca <strong>"Aggiungi a Home"</strong></p></div>
     <div class="step"><div class="step-num">3</div><p>Tocca <strong>Aggiungi</strong> — l'icona apparirà sulla schermata Home</p></div>
   </div>
 
-  <div id="android-instructions" class="steps android-only" style="display:none">
-    <h3>Come installare su Android</h3>
-    <div class="step"><div class="step-num">1</div><p>Tocca il pulsante <strong>⋮</strong> in alto a destra del browser</p></div>
-    <div class="step"><div class="step-num">2</div><p>Tocca <strong>"Installa app"</strong> o <strong>"Aggiungi a schermata Home"</strong></p></div>
-    <div class="step"><div class="step-num">3</div><p>Tocca <strong>Installa</strong> — pronto!</p></div>
+  <div id="android-steps" class="steps" style="display:none">
+    <h3>Installa su Android</h3>
+    <div class="step"><div class="step-num">1</div><p>Tocca <strong>⋮</strong> in alto a destra del browser</p></div>
+    <div class="step"><div class="step-num">2</div><p>Tocca <strong>"Installa app"</strong></p></div>
+    <div class="step"><div class="step-num">3</div><p>Tocca <strong>Installa</strong></p></div>
   </div>
 
   <button class="btn" id="install-btn" style="display:none">📲 Installa l'app</button>
   <div id="installed-badge" class="success-badge" style="display:none">✓ App installata!</div>
 
   <div class="divider"></div>
-
   <button class="notif-btn" id="notif-btn">🔔 Attiva le notifiche</button>
   <div id="notif-ok" class="success-badge" style="display:none">✓ Notifiche attivate!</div>
 </div>
-<footer>Powered by <a href="https://pwa.elisasoulmedium.com">PWA Manager</a></footer>
-
+<footer>Powered by PWA Manager</footer>
 <script>
-(function() {
+(function(){
   var ua = navigator.userAgent;
-  var isIOS = /iPad|iPhone|iPod/.test(ua);
+  var isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
   var isAndroid = /Android/.test(ua);
   var isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-
-  if (isIOS) document.body.classList.add('platform-ios');
-  if (isAndroid) document.body.classList.add('platform-android');
-
-  if (isStandalone) {
-    document.getElementById('installed-badge').style.display = 'inline-flex';
-  } else if (isIOS) {
-    document.getElementById('ios-instructions').style.display = 'block';
-  } else if (isAndroid) {
-    document.getElementById('android-instructions').style.display = 'block';
-  }
-
-  // Install prompt (Chrome/Android)
-  var deferredPrompt;
-  window.addEventListener('beforeinstallprompt', function(e) {
-    e.preventDefault();
-    deferredPrompt = e;
-    document.getElementById('install-btn').style.display = 'inline-flex';
+  if (isStandalone) { document.getElementById('installed-badge').style.display='inline-flex'; }
+  else if (isIOS) { document.getElementById('ios-steps').style.display='block'; }
+  else { document.getElementById('android-steps').style.display='block'; }
+  var deferred;
+  window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); deferred=e; document.getElementById('install-btn').style.display='inline-flex'; });
+  document.getElementById('install-btn').addEventListener('click', async function(){
+    if(!deferred)return; deferred.prompt();
+    var r=await deferred.userChoice;
+    if(r.outcome==='accepted'){document.getElementById('install-btn').style.display='none';document.getElementById('installed-badge').style.display='inline-flex';}
+    deferred=null;
   });
-
-  document.getElementById('install-btn').addEventListener('click', async function() {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    var result = await deferredPrompt.userChoice;
-    if (result.outcome === 'accepted') {
-      document.getElementById('install-btn').style.display = 'none';
-      document.getElementById('installed-badge').style.display = 'inline-flex';
-    }
-    deferredPrompt = null;
-  });
-
-  // Notifications
-  var notifBtn = document.getElementById('notif-btn');
-  if (!('Notification' in window)) {
-    notifBtn.style.display = 'none';
-  } else if (Notification.permission === 'granted') {
-    document.getElementById('notif-btn').style.display = 'none';
-    document.getElementById('notif-ok').style.display = 'inline-flex';
-  }
-
-  notifBtn.addEventListener('click', async function() {
-    notifBtn.disabled = true;
-    notifBtn.textContent = 'Attivazione...';
-    try {
-      var sub = await window.PWAManager.subscribe();
-      if (sub) {
-        notifBtn.style.display = 'none';
-        document.getElementById('notif-ok').style.display = 'inline-flex';
-      } else {
-        notifBtn.textContent = '🔔 Attiva le notifiche';
-        notifBtn.disabled = false;
-      }
-    } catch(e) {
-      notifBtn.textContent = '🔔 Attiva le notifiche';
-      notifBtn.disabled = false;
-    }
+  window.addEventListener('appinstalled',function(){document.getElementById('install-btn').style.display='none';document.getElementById('installed-badge').style.display='inline-flex';});
+  var nb=document.getElementById('notif-btn');
+  if(!('Notification' in window)){nb.style.display='none';}
+  else if(Notification.permission==='granted'){nb.style.display='none';document.getElementById('notif-ok').style.display='inline-flex';}
+  nb.addEventListener('click', async function(){
+    nb.disabled=true; nb.textContent='Attivazione…';
+    try{var s=await window.PWAManager.subscribe();if(s){nb.style.display='none';document.getElementById('notif-ok').style.display='inline-flex';}else{nb.textContent='🔔 Attiva le notifiche';nb.disabled=false;}}
+    catch(e){nb.textContent='🔔 Attiva le notifiche';nb.disabled=false;}
   });
 })();
 </script>
 </body>
-</html>`);
+</html>`;
+}
+
+// /:slug/install → se site_url configurato, redirect a {origin}/install (pagina sul sito target)
+// Se non configurato, serve la pagina locale (funziona per Android, non per iOS full-screen)
+router.get('/:slug/install', (req, res) => {
+  const app = getApp(req.params.slug);
+  if (!app) return res.status(404).send('App not found');
+
+  if (app.site_url) {
+    try {
+      const origin = new URL(app.site_url).origin;
+      return res.redirect(302, origin + '/install');
+    } catch (e) { /* site_url non valido: mostra pagina locale */ }
+  }
+
+  const base = BASE_URL();
+  res.setHeader('Content-Type', 'text/html');
+  res.send(buildInstallHtml(app, base));
+});
+
+// /:slug/install.html → scarica la pagina install pre-configurata da mettere sul sito target
+router.get('/:slug/install.html', (req, res) => {
+  const app = getApp(req.params.slug);
+  if (!app) return res.status(404).send('App not found');
+  const base = BASE_URL();
+  res.setHeader('Content-Type', 'text/html');
+  res.setHeader('Content-Disposition', `attachment; filename="install.html"`);
+  res.send(buildInstallHtml(app, base));
 });
 
 module.exports = router;
