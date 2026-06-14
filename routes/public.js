@@ -142,8 +142,10 @@ router.get('/:slug/init.js', (req, res) => {
     var overrideIconUrl  = __initScript && __initScript.getAttribute('data-icon-url');
     var effectiveIconUrl = overrideIconUrl || ICON_URL;
 
+    // Imposta un meta, sostituendo qualsiasi valore già presente (es. da systeme.io)
     function meta(name, content) {
-      if (document.querySelector('meta[name="' + name + '"]')) return;
+      var existing = document.querySelector('meta[name="' + name + '"]');
+      if (existing) existing.parentNode.removeChild(existing);
       var m = document.createElement('meta');
       m.setAttribute('name', name);
       m.setAttribute('content', content);
@@ -154,7 +156,10 @@ router.get('/:slug/init.js', (req, res) => {
     meta('apple-mobile-web-app-status-bar-style', 'black-translucent');
     if (APP_NAME) meta('apple-mobile-web-app-title', APP_NAME);
     if (THEME) meta('theme-color', THEME);
-    if (effectiveIconUrl && !document.querySelector('link[rel="apple-touch-icon"]')) {
+    // Sostituisce apple-touch-icon esistente (systeme.io ne mette uno suo)
+    if (effectiveIconUrl) {
+      var existing = document.querySelector('link[rel="apple-touch-icon"]');
+      if (existing) existing.parentNode.removeChild(existing);
       var l = document.createElement('link');
       l.setAttribute('rel', 'apple-touch-icon');
       l.setAttribute('href', effectiveIconUrl);
