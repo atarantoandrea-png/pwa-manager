@@ -243,16 +243,9 @@ router.get('/:slug/init.js', (req, res) => {
         console.warn('[PWAManager] SW registration failed:', e);
       });
     } else {
-      try {
-        var swCode = "importScripts('" + BASE + '/' + SLUG + "/sw-core.js');";
-        var swBlob = new Blob([swCode], { type: 'application/javascript' });
-        var swBlobUrl = URL.createObjectURL(swBlob);
-        navigator.serviceWorker.register(swBlobUrl, { scope: '/' }).catch(function(e) {
-          console.warn('[PWAManager] Blob SW registration failed:', e);
-        });
-      } catch(e) {
-        console.warn('[PWAManager] Blob SW creation failed:', e);
-      }
+      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function(e) {
+        console.warn('[PWAManager] SW registration failed:', e);
+      });
     }
   }
 
