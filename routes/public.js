@@ -292,7 +292,7 @@ router.get('/:slug/init.js', (req, res) => {
           'box-shadow:0 -4px 40px rgba(0,0,0,.6);',
           'pointer-events:all;',
           'animation:pwa-slide .38s cubic-bezier(.2,.8,.25,1) both;',
-          'font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;',
+          'font-family:-apple-system,BlinkMacSystemFont,sans-serif;',
         '">',
           '<div style="font-size:26px;flex-shrink:0">🔔</div>',
           '<div style="flex:1;min-width:0">',
@@ -506,12 +506,21 @@ footer{margin-top:24px;font-size:12px;color:#aaa}
 </html>`;
 }
 
-// /:slug/install → pagina di istruzioni (social proof + bottone notifiche + "vai al sito").
-// Niente redirect: prima causava 404 quando il sito non aveva una pagina /install.
-// L'installazione standalone iOS avviene aprendo il SITO VERO (dove init.js inietta i meta tag).
+// /:slug/install → reindirizza alla pagina /install SELF-HOSTED sul dominio del sito.
+// iOS, quando fai "Aggiungi a Home", apre solo URL dello stesso dominio dell'app:
+// se l'install page sta sul manager (cross-origin), l'app installata apre Safari
+// con la barra invece del full-screen. Per questo il link deve rimbalzare al sito,
+// dove i meta apple statici + manifest same-origin fanno partire lo standalone.
+// (Le app servite da piattaforme senza /install — es. systeme.io — non usano questa route.)
 router.get('/:slug/install', (req, res) => {
   const app = getApp(req.params.slug);
   if (!app) return res.status(404).send('App not found');
+  if (app.site_url) {
+    try {
+      const origin = new URL(app.site_url).origin;
+      return res.redirect(302, origin + '/install');
+    } catch (e) { /* site_url non valido: mostra la pagina locale del manager */ }
+  }
   const base = BASE_URL();
   res.setHeader('Content-Type', 'text/html');
   res.send(buildInstallHtml(app, base));
