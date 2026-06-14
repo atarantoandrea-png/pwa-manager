@@ -54,4 +54,7 @@ db.exec(`
   );
 `);
 
+// Migrations
+try { db.exec(`ALTER TABLE apps ADD COLUMN install_url TEXT DEFAULT ''`); } catch(e) {}
+
 module.exports = db;

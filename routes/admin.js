@@ -92,14 +92,15 @@ router.get('/apps/:id', requireAuth, (req, res) => {
 });
 
 router.put('/apps/:id', requireAuth, (req, res) => {
-  const { name, description, site_url, bg_color, theme_color, display } = req.body;
+  const { name, description, site_url, install_url, bg_color, theme_color, display } = req.body;
   const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(req.params.id);
   if (!app) return res.status(404).json({ error: 'App non trovata' });
   db.prepare(`
-    UPDATE apps SET name=?, description=?, site_url=?, bg_color=?, theme_color=?, display=?
+    UPDATE apps SET name=?, description=?, site_url=?, install_url=?, bg_color=?, theme_color=?, display=?
     WHERE id=?
   `).run(name || app.name, description ?? app.description, site_url ?? app.site_url,
-         bg_color || app.bg_color, theme_color || app.theme_color, display || app.display, req.params.id);
+         install_url ?? app.install_url ?? '', bg_color || app.bg_color,
+         theme_color || app.theme_color, display || app.display, req.params.id);
   res.json(db.prepare('SELECT * FROM apps WHERE id = ?').get(req.params.id));
 });
 

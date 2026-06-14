@@ -644,7 +644,8 @@ function renderTabOverview(app) {
 // ─── TAB: INSTALL ─────────────────────────────────────────────────────────────
 function renderTabInstall(app) {
   const base = getBase();
-  const installUrl = `${base}/${app.slug}/install`;
+  const defaultInstallUrl = `${base}/${app.slug}/install`;
+  const installUrl = app.install_url || defaultInstallUrl;
   const snippet1 = `<!-- Aggiungi nel <head> del tuo sito -->
 <link rel="manifest" href="${base}/${app.slug}/manifest.json" crossorigin="use-credentials">
 <meta name="theme-color" content="${app.theme_color}">
@@ -657,15 +658,19 @@ importScripts('${base}/${app.slug}/sw-core.js');`;
     <div class="card">
       <div class="card-title">🔗 Pagina di installazione</div>
       <p style="font-size:13px;color:var(--text-soft);margin-bottom:12px">Condividi questo link oppure scarica la pagina e mettila sul tuo sito — obbligatorio per nascondere la barra Safari su iPhone.</p>
-      <div class="install-link-box">
-        <span class="install-link-url">${installUrl}</span>
-        <button class="btn btn-ghost btn-sm" onclick="copyText('${installUrl}',this)">Copia</button>
-        <a href="${installUrl}" target="_blank" class="btn btn-accent btn-sm">Apri →</a>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <input id="install-url-input" type="url" value="${escHtml(installUrl)}"
+          style="flex:1;font-size:13px;font-family:monospace;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:#f8fafc;color:var(--text)"
+          placeholder="${defaultInstallUrl}">
+        <button class="btn btn-ghost btn-sm" onclick="copyText(document.getElementById('install-url-input').value,this)">Copia</button>
+        <button class="btn btn-accent btn-sm" onclick="saveInstallUrl(${app.id})">Salva</button>
+        <a id="install-url-open" href="${escHtml(installUrl)}" target="_blank" class="btn btn-ghost btn-sm">Apri →</a>
       </div>
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
         <a href="${downloadUrl}" download="install.html" class="btn btn-ghost btn-sm">📥 Scarica install.html</a>
+        <button class="btn btn-ghost btn-sm" onclick="copyEmbedHtml(${app.id})">📋 Copia HTML per sito</button>
       </div>
-      <p style="font-size:12px;color:var(--text-muted);margin-top:10px">💡 <strong>iOS:</strong> per nascondere la barra di Safari dopo l'installazione, carica <code>install.html</code> sul tuo sito come <code>/install</code> e aggiungi <code>/sw.js</code> nella root. Poi imposta <em>Site URL</em> nelle impostazioni app.</p>
+      <p style="font-size:12px;color:var(--text-muted);margin-top:10px">💡 Inserisci l'URL della tua pagina install personalizzata (es. su systeme.io) oppure usa quello di default. <strong>HTML per sito</strong>: genera il codice da incollare nel builder del tuo sito.</p>
     </div>
 
     <div class="card">
@@ -693,6 +698,109 @@ importScripts('${base}/${app.slug}/sw-core.js');`;
         <button class="copy-btn" onclick="copyText('${app.vapid_public}',this)">Copia</button>
       </div>
     </div>`;
+}
+
+async function saveInstallUrl(appId) {
+  const input = document.getElementById('install-url-input');
+  const val = input.value.trim();
+  const updated = await api(`/apps/${appId}`, { method: 'PUT', body: JSON.stringify({ install_url: val }) });
+  if (updated) {
+    state.currentApp = updated;
+    document.getElementById('install-url-open').href = val || updated.install_url || '';
+    const btn = document.querySelector('[onclick="saveInstallUrl(' + appId + ')"]');
+    if (btn) { btn.textContent = '✓ Salvato'; setTimeout(() => btn.textContent = 'Salva', 1500); }
+  }
+}
+
+function copyEmbedHtml(appId) {
+  const app = state.currentApp;
+  const base = getBase();
+  const iconUrl = app.icon_path ? base + app.icon_path : '';
+  const accent = app.theme_color || '#6366f1';
+  const siteUrl = app.site_url || '';
+  const html = `<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Installa ${app.name}</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="${app.name}">
+<meta name="theme-color" content="${accent}">
+${iconUrl ? `<link rel="apple-touch-icon" href="${iconUrl}">` : ''}
+<script>
+(function(){
+  var standalone=window.navigator.standalone===true||(window.matchMedia&&window.matchMedia('(display-mode:standalone)').matches);
+  if(standalone&&'${siteUrl}'){window.location.replace('${siteUrl}');return;}
+})();
+<\/script>
+<script src="${base}/${app.slug}/init.js" defer><\/script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f0f5;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+.card{background:#fff;border-radius:24px;padding:40px 32px;max-width:400px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.12)}
+.icon{width:96px;height:96px;border-radius:22px;margin:0 auto 20px;overflow:hidden;background:${accent};display:flex;align-items:center;justify-content:center}
+.icon img{width:100%;height:100%;object-fit:cover}
+h1{font-size:24px;font-weight:700;color:#111;margin-bottom:20px}
+.steps{text-align:left;margin-bottom:24px}
+.steps h3{font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px}
+.step{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px}
+.num{width:24px;height:24px;border-radius:50%;background:${accent};color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.step p{font-size:14px;color:#444;line-height:1.5}
+.step p strong{color:#111}
+.btn-install{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;border-radius:14px;background:${accent};color:#fff;font-size:16px;font-weight:700;border:none;cursor:pointer;text-decoration:none}
+.ok{display:none;align-items:center;justify-content:center;gap:6px;background:#d1fae5;color:#065f46;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;margin-top:12px}
+</style>
+</head>
+<body>
+<div class="card">
+  ${iconUrl ? `<div class="icon"><img src="${iconUrl}" alt="${app.name}"></div>` : ''}
+  <h1>${app.name}</h1>
+
+  <div id="ios" class="steps" style="display:none">
+    <h3>Installa su iPhone / iPad</h3>
+    ${siteUrl ? `<div class="step"><div class="num">1</div><p>Apri <strong><a href="${siteUrl}" style="color:${accent}">${siteUrl.replace(/^https?:\\/\\//, '')}</a></strong> in Safari</p></div>
+    <div class="step"><div class="num">2</div><p>Tocca <strong>Condividi</strong> &#x2197;</p></div>
+    <div class="step"><div class="num">3</div><p>Tocca <strong>"Aggiungi a Home"</strong></p></div>
+    <div class="step"><div class="num">4</div><p>Tocca <strong>Aggiungi</strong></p></div>` : `<div class="step"><div class="num">1</div><p>Tocca <strong>Condividi</strong> &#x2197;</p></div>
+    <div class="step"><div class="num">2</div><p>Tocca <strong>"Aggiungi a Home"</strong></p></div>
+    <div class="step"><div class="num">3</div><p>Tocca <strong>Aggiungi</strong></p></div>`}
+  </div>
+
+  <div id="android" class="steps" style="display:none">
+    <h3>Installa su Android</h3>
+    <div class="step"><div class="num">1</div><p>Tocca <strong>⋮</strong> in alto a destra</p></div>
+    <div class="step"><div class="num">2</div><p>Tocca <strong>"Installa app"</strong></p></div>
+  </div>
+
+  <button class="btn-install" id="btn-install" style="display:none">📲 Installa l'app</button>
+  <a class="ok" id="ok-badge">✓ App installata!</a>
+</div>
+<script>
+(function(){
+  var ua=navigator.userAgent;
+  var isIOS=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  var isStandalone=window.navigator.standalone||window.matchMedia('(display-mode:standalone)').matches;
+  if(isStandalone){document.getElementById('ok-badge').style.display='flex';}
+  else if(isIOS){document.getElementById('ios').style.display='block';}
+  else{document.getElementById('android').style.display='block';}
+  var deferred;
+  window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferred=e;document.getElementById('btn-install').style.display='flex';});
+  document.getElementById('btn-install').addEventListener('click',async function(){
+    if(!deferred)return;deferred.prompt();
+    var r=await deferred.userChoice;
+    if(r.outcome==='accepted'){this.style.display='none';document.getElementById('ok-badge').style.display='flex';}
+    deferred=null;
+  });
+})();
+<\/script>
+</body>
+</html>`;
+  navigator.clipboard.writeText(html).then(() => {
+    const btn = document.querySelector('[onclick="copyEmbedHtml(' + appId + ')"]');
+    if (btn) { btn.textContent = '✓ Copiato!'; setTimeout(() => btn.textContent = '📋 Copia HTML per sito', 1800); }
+  }).catch(() => alert('Copia manuale:\n' + html.substring(0, 200) + '...'));
 }
 
 // ─── TAB: PUSH ────────────────────────────────────────────────────────────────
