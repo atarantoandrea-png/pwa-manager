@@ -692,8 +692,15 @@ importScripts('${base}/${app.slug}/sw-core.js');`;
 
 // ─── TAB: PUSH ────────────────────────────────────────────────────────────────
 async function renderTabPush(app) {
+  // Ricarica l'app per avere il conteggio iscritti SEMPRE aggiornato
+  // (altrimenti chi si iscrive dopo l'apertura della pagina non viene "visto").
+  const fresh = await api(`/apps/${app.id}`);
+  if (fresh) { app = fresh; state.currentApp = fresh; }
   const notifs = await api(`/apps/${app.id}/notifications`) || [];
   const iconSrc = app.icon_path ? app.icon_path : '';
+  // Icona stabile servita dal sito (non dipende dal volume uploads)
+  let siteIcon = '';
+  try { if (app.site_url) siteIcon = new URL(app.site_url).origin + '/src/icon-192.png'; } catch(e){}
 
   document.getElementById('tab-push').innerHTML = `
     <div class="card">
@@ -722,9 +729,13 @@ async function renderTabPush(app) {
           </div>
           <div class="form-group">
             <label>URL azione (al click)</label>
-            <input type="url" name="action_url" placeholder="${app.site_url||'https://tuosito.com'}">
+            <input type="url" name="action_url" value="${app.site_url||''}" placeholder="${app.site_url||'https://tuosito.com'}">
           </div>
           <div class="form-group">
+            <label>URL icona notifica</label>
+            <input type="url" name="icon_url" value="${siteIcon}" placeholder="https://...">
+          </div>
+          <div class="form-group full">
             <label>URL immagine grande (opzionale)</label>
             <input type="url" name="image_url" placeholder="https://...">
           </div>
