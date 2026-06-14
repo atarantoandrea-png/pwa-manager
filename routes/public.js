@@ -106,80 +106,6 @@ router.get('/:slug/sw.js', (req, res) => {
   res.send(`importScripts('${base}/${app.slug}/sw-core.js');`);
 });
 
-// ─── PUSH FRAME (iframe same-origin per push subscription) ──────────────────
-
-router.get('/:slug/push-frame', (req, res) => {
-  const app = getApp(req.params.slug);
-  if (!app) return res.status(404).send('Not found');
-  const base = BASE_URL();
-  res.setHeader('Content-Type', 'text/html');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-<script>
-(function(){
-  var BASE = '${base}';
-  var SLUG = '${app.slug}';
-  var VAPID = '${app.vapid_public}';
-  var SUBSCRIBE_URL = BASE + '/' + SLUG + '/subscribe';
-
-  function urlBase64ToUint8Array(b) {
-    var p = '='.repeat((4 - b.length % 4) % 4);
-    var s = (b + p).replace(/-/g, '+').replace(/_/g, '/');
-    var r = atob(s); var a = new Uint8Array(r.length);
-    for (var i = 0; i < r.length; ++i) a[i] = r.charCodeAt(i);
-    return a;
-  }
-
-  function ua() {
-    var u = navigator.userAgent;
-    if (/iPad|iPhone|iPod/.test(u)) return 'ios';
-    if (/Android/.test(u)) return 'android';
-    return 'desktop';
-  }
-
-  async function doSubscribe() {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      window.parent.postMessage({ type: 'pwa-push-result', ok: false, error: 'unsupported' }, '*');
-      return;
-    }
-    try {
-      var reg = await navigator.serviceWorker.register('/' + SLUG + '/sw.js', { scope: '/' + SLUG + '/' });
-      await navigator.serviceWorker.ready;
-      var existing = await reg.pushManager.getSubscription();
-      var sub = existing;
-      if (!sub) {
-        var perm = await Notification.requestPermission();
-        if (perm !== 'granted') {
-          window.parent.postMessage({ type: 'pwa-push-result', ok: false, error: 'denied' }, '*');
-          return;
-        }
-        sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(VAPID)
-        });
-        await fetch(SUBSCRIBE_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ subscription: sub, platform: ua(), userAgent: navigator.userAgent })
-        });
-      }
-      window.parent.postMessage({ type: 'pwa-push-result', ok: true }, '*');
-    } catch(e) {
-      window.parent.postMessage({ type: 'pwa-push-result', ok: false, error: e.message }, '*');
-    }
-  }
-
-  window.addEventListener('message', function(e) {
-    if (e.data && e.data.type === 'pwa-push-subscribe') doSubscribe();
-  });
-
-  // Notifica al parent che il frame è pronto
-  window.parent.postMessage({ type: 'pwa-push-ready' }, '*');
-})();
-<\/script>
-</head><body></body></html>`);
-});
-
 // ─── INIT SCRIPT (add to target site <head>) ──────────────────────────────
 
 router.get('/:slug/init.js', (req, res) => {
@@ -269,96 +195,66 @@ router.get('/:slug/init.js', (req, res) => {
     } catch (e) { /* Blob non supportato: i meta apple bastano comunque per iOS */ }
   })();
 
-  // ─── Push via iframe same-origin (pwa.elisasoulmedium.com ospita il SW reale) ───
-  // I blob-URL SW non supportano push subscription affidabile: usiamo un iframe
-  // nascosto sullo stesso origin del manager, dove il SW viene registrato
-  // con URL reale /slug/sw.js e la push subscription è valida e persistente.
-  var _pushFrameReady = false;
-  var _readyResolvers = [];
-  var _resultResolvers = [];
-  var _pushFrame = null;
-
-  function ensurePushFrame() {
-    if (_pushFrame) return;
-    var isOnManager = (window.location.hostname === new URL(BASE).hostname);
-    if (isOnManager) {
-      navigator.serviceWorker.register('/' + SLUG + '/sw.js', { scope: '/' + SLUG + '/' }).catch(function(){});
-      _pushFrameReady = true;
-      return;
-    }
-    _pushFrame = document.createElement('iframe');
-    _pushFrame.src = BASE + '/' + SLUG + '/push-frame';
-    _pushFrame.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;border:0;top:0;left:0;z-index:-1';
-    _pushFrame.allow = 'notifications';
-    document.body.appendChild(_pushFrame);
+  function urlBase64ToUint8Array(base64String) {
+    var padding = '='.repeat((4 - base64String.length % 4) % 4);
+    var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    var raw = atob(base64);
+    var arr = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; ++i) arr[i] = raw.charCodeAt(i);
+    return arr;
   }
 
-  window.addEventListener('message', function(e) {
-    if (!e.data) return;
-    if (e.data.type === 'pwa-push-ready') {
-      _pushFrameReady = true;
-      var fns = _readyResolvers.splice(0);
-      fns.forEach(function(fn) { fn(); });
-    }
-    if (e.data.type === 'pwa-push-result') {
-      var fns = _resultResolvers.splice(0);
-      fns.forEach(function(fn) { fn(e.data); });
-    }
-  });
+  function getPlatform() {
+    var ua = navigator.userAgent;
+    if (/iPad|iPhone|iPod/.test(ua)) return 'ios';
+    if (/Android/.test(ua)) return 'android';
+    return 'desktop';
+  }
 
-  function subscribe() {
-    return new Promise(function(resolve, reject) {
-      var isOnManager = (window.location.hostname === new URL(BASE).hostname);
-      if (isOnManager) {
-        navigator.serviceWorker.ready.then(function(reg) {
-          return reg.pushManager.getSubscription().then(function(existing) {
-            if (existing) { resolve(existing); return; }
-            return Notification.requestPermission().then(function(perm) {
-              if (perm !== 'granted') { resolve(null); return; }
-              function urlB(b) {
-                var p='='.repeat((4-b.length%4)%4),s=(b+p).replace(/-/g,'+').replace(/_/g,'/'),r=atob(s),a=new Uint8Array(r.length);
-                for(var i=0;i<r.length;++i)a[i]=r.charCodeAt(i);return a;
-              }
-              return reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:urlB(VAPID) }).then(function(sub) {
-                var ua=navigator.userAgent;
-                var pl=/iPad|iPhone|iPod/.test(ua)?'ios':/Android/.test(ua)?'android':'desktop';
-                return fetch(SUBSCRIBE_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscription:sub,platform:pl,userAgent:ua})}).then(function(){resolve(sub);});
-              });
-            });
-          });
-        }).catch(reject);
-        return;
-      }
-      // Sul sito target: delega tutto all'iframe same-origin
-      ensurePushFrame();
-      function doSend() {
-        _resultResolvers.push(function(result) {
-          if (result && result.ok) resolve(true);
-          else resolve(null);
-        });
-        _pushFrame.contentWindow.postMessage({ type: 'pwa-push-subscribe' }, '*');
-      }
-      if (_pushFrameReady) { doSend(); }
-      else { _readyResolvers.push(function() { doSend(); }); }
+  async function subscribe() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+    var reg = await navigator.serviceWorker.ready;
+    var existing = await reg.pushManager.getSubscription();
+    if (existing) return existing;
+    var perm = await Notification.requestPermission();
+    if (perm !== 'granted') return null;
+    var sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID)
     });
+    await fetch(SUBSCRIBE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subscription: sub,
+        platform: getPlatform(),
+        userAgent: navigator.userAgent
+      })
+    });
+    return sub;
   }
 
   window.PWAManager = { subscribe: subscribe, slug: SLUG };
 
-  // SW blob solo per manifest/install (non per push)
   if ('serviceWorker' in navigator) {
     var isOnManager = (window.location.hostname === new URL(BASE).hostname);
-    if (!isOnManager) {
+    if (isOnManager) {
+      navigator.serviceWorker.register('/' + SLUG + '/sw.js', { scope: '/' + SLUG + '/' }).catch(function(e) {
+        console.warn('[PWAManager] SW registration failed:', e);
+      });
+    } else {
       try {
         var swCode = "importScripts('" + BASE + '/' + SLUG + "/sw-core.js');";
         var swBlob = new Blob([swCode], { type: 'application/javascript' });
-        navigator.serviceWorker.register(URL.createObjectURL(swBlob), { scope: '/' }).catch(function(){});
-      } catch(e) {}
+        var swBlobUrl = URL.createObjectURL(swBlob);
+        navigator.serviceWorker.register(swBlobUrl, { scope: '/' }).catch(function(e) {
+          console.warn('[PWAManager] Blob SW registration failed:', e);
+        });
+      } catch(e) {
+        console.warn('[PWAManager] Blob SW creation failed:', e);
+      }
     }
   }
-
-  if (document.body) { ensurePushFrame(); }
-  else { document.addEventListener('DOMContentLoaded', ensurePushFrame); }
 
   // ─── Auto-prompt notifiche (standalone, prima apertura) ─────────────────────
   (function() {
