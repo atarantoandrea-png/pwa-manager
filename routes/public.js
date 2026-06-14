@@ -165,6 +165,96 @@ router.get('/:slug/init.js', (req, res) => {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js', { scope: '/' });
   }
+
+  // ─── Auto-prompt notifiche (standalone, prima apertura) ─────────────────────
+  (function() {
+    var SNOOZE_KEY = 'pwa_notif_snooze_' + SLUG;
+    var SHOWN_KEY  = 'pwa_notif_shown_'  + SLUG;
+
+    function isStandalone() {
+      return window.navigator.standalone === true ||
+        (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    }
+
+    function shouldShow() {
+      if (!('Notification' in window)) return false;
+      if (Notification.permission !== 'default') return false;
+      if (!isStandalone()) return false;
+      var snooze = localStorage.getItem(SNOOZE_KEY);
+      if (snooze && Date.now() < parseInt(snooze, 10)) return false;
+      return true;
+    }
+
+    function showPrompt() {
+      if (!shouldShow()) return;
+      if (document.getElementById('pwa-notif-sheet')) return;
+
+      var sheet = document.createElement('div');
+      sheet.id = 'pwa-notif-sheet';
+      sheet.style.cssText = [
+        'position:fixed;bottom:0;left:0;right:0;z-index:2147483647',
+        'padding:0 12px calc(16px + env(safe-area-inset-bottom))',
+        'pointer-events:none'
+      ].join(';');
+
+      sheet.innerHTML = [
+        '<style>',
+        '@keyframes pwa-slide{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}',
+        '</style>',
+        '<div id="pwa-notif-card" style="',
+          'background:rgba(22,18,32,.97);',
+          'border:1px solid rgba(185,163,227,.22);',
+          'border-radius:20px;padding:18px 18px 16px;',
+          'display:flex;align-items:center;gap:14px;',
+          'box-shadow:0 -4px 40px rgba(0,0,0,.6);',
+          'pointer-events:all;',
+          'animation:pwa-slide .38s cubic-bezier(.2,.8,.25,1) both;',
+          'font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;',
+        '">',
+          '<div style="font-size:26px;flex-shrink:0">🔔</div>',
+          '<div style="flex:1;min-width:0">',
+            '<div style="font-size:15px;font-weight:600;color:#e8e2f0;line-height:1.3">Resta in contatto</div>',
+            '<div style="font-size:13px;color:#9d94ab;margin-top:3px;line-height:1.4">Ricevi un avviso quando ci sono nuovi contenuti</div>',
+          '</div>',
+          '<div style="display:flex;gap:8px;flex-shrink:0">',
+            '<button id="pwa-notif-later" style="',
+              'background:transparent;border:1px solid rgba(185,163,227,.3);',
+              'color:#9d94ab;border-radius:10px;padding:8px 13px;',
+              'font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;',
+            '">Più tardi</button>',
+            '<button id="pwa-notif-ok" style="',
+              'background:linear-gradient(135deg,#c9b3ef,#a98fd6);',
+              'border:none;color:#1c1428;border-radius:10px;padding:8px 14px;',
+              'font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;',
+            '">Attiva</button>',
+          '</div>',
+        '</div>'
+      ].join('');
+
+      document.body.appendChild(sheet);
+
+      document.getElementById('pwa-notif-ok').addEventListener('click', async function() {
+        document.getElementById('pwa-notif-ok').textContent = '…';
+        document.getElementById('pwa-notif-ok').disabled = true;
+        try {
+          var sub = await subscribe();
+          if (sub) { localStorage.setItem(SHOWN_KEY, '1'); }
+        } catch(e) {}
+        sheet.remove();
+      });
+
+      document.getElementById('pwa-notif-later').addEventListener('click', function() {
+        localStorage.setItem(SNOOZE_KEY, String(Date.now() + 3 * 24 * 60 * 60 * 1000));
+        sheet.remove();
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() { setTimeout(showPrompt, 3500); });
+    } else {
+      setTimeout(showPrompt, 3500);
+    }
+  })();
 })();
 `);
 });
