@@ -127,12 +127,21 @@ router.get('/:slug/init.js', (req, res) => {
   var BG = ${JSON.stringify(app.bg_color || '#ffffff')};
   var SITE_URL = ${JSON.stringify(app.site_url || '')};
 
+  // Cattura subito il <script> chiamante per leggere eventuali data-* overrides
+  var __initScript = document.currentScript;
+
   // ─── iOS / PWA: inietta i tag che servono per la modalità standalone ─────────
   // Senza "apple-mobile-web-app-capable" iOS apre l'icona come scorciatoia Safari
   // (con barra indietro/condividi/ricarica). Questo la rende un'app full-screen,
   // esattamente come fa Progressier. Nessun file da caricare sul sito.
   (function injectPwaTags() {
     var head = document.head || document.documentElement;
+
+    // Override via data-start-url / data-icon-url sull'elemento <script> chiamante
+    var overrideStartUrl = __initScript && __initScript.getAttribute('data-start-url');
+    var overrideIconUrl  = __initScript && __initScript.getAttribute('data-icon-url');
+    var effectiveIconUrl = overrideIconUrl || ICON_URL;
+
     function meta(name, content) {
       if (document.querySelector('meta[name="' + name + '"]')) return;
       var m = document.createElement('meta');
@@ -145,10 +154,10 @@ router.get('/:slug/init.js', (req, res) => {
     meta('apple-mobile-web-app-status-bar-style', 'black-translucent');
     if (APP_NAME) meta('apple-mobile-web-app-title', APP_NAME);
     if (THEME) meta('theme-color', THEME);
-    if (ICON_URL && !document.querySelector('link[rel="apple-touch-icon"]')) {
+    if (effectiveIconUrl && !document.querySelector('link[rel="apple-touch-icon"]')) {
       var l = document.createElement('link');
       l.setAttribute('rel', 'apple-touch-icon');
-      l.setAttribute('href', ICON_URL);
+      l.setAttribute('href', effectiveIconUrl);
       head.appendChild(l);
     }
     // Manifest SAME-ORIGIN via Blob: iOS/Android vietano un manifest cross-origin
@@ -156,7 +165,8 @@ router.get('/:slug/init.js', (req, res) => {
     // Blob sul dominio del sito, start_url punta al sito stesso ed è valido.
     try {
       var origin = window.location.origin;
-      var startUrl = (SITE_URL && SITE_URL.indexOf(origin) === 0) ? SITE_URL : (origin + '/');
+      var startUrl = overrideStartUrl ||
+        ((SITE_URL && SITE_URL.indexOf(origin) === 0) ? SITE_URL : (origin + '/'));
       var mf = {
         name: APP_NAME,
         short_name: APP_NAME,
@@ -165,9 +175,9 @@ router.get('/:slug/init.js', (req, res) => {
         display: 'standalone',
         background_color: BG,
         theme_color: THEME,
-        icons: ICON_URL ? [
-          { src: ICON_URL, sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: ICON_URL, sizes: '512x512', type: 'image/png', purpose: 'any' }
+        icons: effectiveIconUrl ? [
+          { src: effectiveIconUrl, sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: effectiveIconUrl, sizes: '512x512', type: 'image/png', purpose: 'any' }
         ] : []
       };
       var blob = new Blob([JSON.stringify(mf)], { type: 'application/manifest+json' });
