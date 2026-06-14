@@ -212,6 +212,17 @@ router.get('/:slug/vapid-public', (req, res) => {
 router.get('/:slug/install', (req, res) => {
   const app = getApp(req.params.slug);
   if (!app) return res.status(404).send('App not found');
+
+  // Se il sito ha un proprio dominio, la pagina di installazione DEVE stare lì
+  // (iOS apre solo URL dello stesso dominio dell'app). Reindirizziamo alla
+  // pagina /install self-hosted sul sito di destinazione.
+  if (app.site_url) {
+    try {
+      const origin = new URL(app.site_url).origin;
+      return res.redirect(302, origin + '/install');
+    } catch (e) { /* site_url non valido: mostra la pagina locale */ }
+  }
+
   const base = BASE_URL();
   const iconUrl = app.icon_path ? base + app.icon_path : '';
   const subCount = db.prepare('SELECT COUNT(*) as n FROM subscriptions WHERE app_id = ?').get(app.id).n;
