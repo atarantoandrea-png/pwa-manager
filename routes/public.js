@@ -237,14 +237,25 @@ router.get('/:slug/init.js', (req, res) => {
   window.PWAManager = { subscribe: subscribe, slug: SLUG };
 
   if ('serviceWorker' in navigator) {
-    // Se siamo sul dominio del manager, usiamo il SW per-slug già servito (/{slug}/sw.js).
-    // Se siamo sul sito target (stesso origin), il sito deve avere un /sw.js proprio.
     var isOnManager = (window.location.hostname === new URL(BASE).hostname);
-    var swPath = isOnManager ? ('/' + SLUG + '/sw.js') : '/sw.js';
-    var swScope = isOnManager ? ('/' + SLUG + '/') : '/';
-    navigator.serviceWorker.register(swPath, { scope: swScope }).catch(function(e) {
-      console.warn('[PWAManager] SW registration failed:', e);
-    });
+    if (isOnManager) {
+      navigator.serviceWorker.register('/' + SLUG + '/sw.js', { scope: '/' + SLUG + '/' }).catch(function(e) {
+        console.warn('[PWAManager] SW registration failed:', e);
+      });
+    } else {
+      // Sul sito target non esiste /sw.js, quindi creiamo il SW via blob URL (stesso origin).
+      // Il blob importa sw-core.js dal manager (CORS aperto) — identico a come gestiamo il manifest.
+      try {
+        var swCode = "importScripts('" + BASE + '/' + SLUG + "/sw-core.js');";
+        var swBlob = new Blob([swCode], { type: 'application/javascript' });
+        var swBlobUrl = URL.createObjectURL(swBlob);
+        navigator.serviceWorker.register(swBlobUrl, { scope: '/' }).catch(function(e) {
+          console.warn('[PWAManager] Blob SW registration failed:', e);
+        });
+      } catch(e) {
+        console.warn('[PWAManager] Blob SW creation failed:', e);
+      }
+    }
   }
 
   // ─── Auto-prompt notifiche (standalone, prima apertura) ─────────────────────
