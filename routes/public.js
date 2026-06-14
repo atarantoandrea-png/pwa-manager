@@ -163,7 +163,14 @@ router.get('/:slug/init.js', (req, res) => {
   window.PWAManager = { subscribe: subscribe, slug: SLUG };
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' });
+    // Se siamo sul dominio del manager, usiamo il SW per-slug già servito (/{slug}/sw.js).
+    // Se siamo sul sito target (stesso origin), il sito deve avere un /sw.js proprio.
+    var isOnManager = (window.location.hostname === new URL(BASE).hostname);
+    var swPath = isOnManager ? ('/' + SLUG + '/sw.js') : '/sw.js';
+    var swScope = isOnManager ? ('/' + SLUG + '/') : '/';
+    navigator.serviceWorker.register(swPath, { scope: swScope }).catch(function(e) {
+      console.warn('[PWAManager] SW registration failed:', e);
+    });
   }
 
   // ─── Auto-prompt notifiche (standalone, prima apertura) ─────────────────────
@@ -303,18 +310,13 @@ router.get('/:slug/install', (req, res) => {
   const app = getApp(req.params.slug);
   if (!app) return res.status(404).send('App not found');
 
-  // Se il sito ha un proprio dominio, la pagina di installazione DEVE stare lì
-  // (iOS apre solo URL dello stesso dominio dell'app). Reindirizziamo alla
-  // pagina /install self-hosted sul sito di destinazione.
-  if (app.site_url) {
-    try {
-      const origin = new URL(app.site_url).origin;
-      return res.redirect(302, origin + '/install');
-    } catch (e) { /* site_url non valido: mostra la pagina locale */ }
-  }
+  // Nota: NON reindirizziamo a {site_url}/install perché quella pagina potrebbe non esistere.
+  // La pagina install è servita direttamente dal PWA Manager.
+  // In standalone mode (app già installata), il JavaScript nella pagina fa redirect a site_url.
 
   const base = BASE_URL();
   const iconUrl = app.icon_path ? base + app.icon_path : '';
+  const siteUrl = app.site_url || '';
   const subCount = db.prepare('SELECT COUNT(*) as n FROM subscriptions WHERE app_id = ?').get(app.id).n;
 
   res.setHeader('Content-Type', 'text/html');
@@ -322,16 +324,24 @@ router.get('/:slug/install', (req, res) => {
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Installa ${app.name}</title>
+<!-- Se già installata (standalone), apri subito l'app vera -->
+<script>
+(function(){
+  var s = window.navigator.standalone === true ||
+    (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  if (s && '${siteUrl}') { window.location.replace('${siteUrl}'); }
+})();
+</script>
 <link rel="manifest" href="${base}/${app.slug}/manifest.json" crossorigin="use-credentials">
-<meta name="theme-color" content="${app.theme_color}">
+<meta name="theme-color" content="${app.theme_color || '#6366f1'}">
 <script src="${base}/${app.slug}/init.js" defer></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --accent: ${app.theme_color};
-    --bg: ${app.bg_color};
+    --accent: ${app.theme_color || '#6366f1'};
+    --bg: ${app.bg_color || '#ffffff'};
   }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f0f5; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
   .card { background: white; border-radius: 24px; padding: 40px 32px; max-width: 400px; width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.12); }
