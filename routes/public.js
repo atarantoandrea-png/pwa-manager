@@ -223,14 +223,18 @@ router.get('/:slug/init.js', (req, res) => {
   async function subscribe() {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
     var reg = await navigator.serviceWorker.ready;
-    var existing = await reg.pushManager.getSubscription();
-    if (existing) return existing;
-    var perm = await Notification.requestPermission();
-    if (perm !== 'granted') return null;
-    var sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID)
-    });
+    var sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      var perm = await Notification.requestPermission();
+      if (perm !== 'granted') return null;
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID)
+      });
+    }
+    // Invia SEMPRE al server, anche se la subscription esisteva già nel browser:
+    // così se l'utente era stato rimosso dalla dashboard, ri-cliccando torna iscritto.
+    // Il server fa ON CONFLICT(endpoint) DO UPDATE → nessun doppione.
     await fetch(SUBSCRIBE_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
