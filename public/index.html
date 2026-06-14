@@ -415,7 +415,7 @@ tbody tr:hover{background:#fafafa}
 
 <script>
 // ─── STATE ───────────────────────────────────────────────────────────────────
-let state = { apps: [], currentApp: null, currentTab: 'overview' };
+let state = { apps: [], currentApp: null, currentTab: 'overview', pollTimer: null };
 
 // ─── INIT ────────────────────────────────────────────────────────────────────
 async function init() {
@@ -459,6 +459,7 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
 
 // ─── NAVIGATION ───────────────────────────────────────────────────────────────
 function navigate(view, params) {
+  stopAppPoll();
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const viewEl = document.getElementById('view-' + view);
@@ -471,7 +472,29 @@ function navigate(view, params) {
   if (view === 'app-detail' && params) {
     state.currentApp = params;
     renderAppDetail(params);
+    startAppPoll(params.id);
   }
+}
+
+// ─── AUTO-REFRESH iscritti in tempo reale (mentre la pagina dettaglio è aperta) ──
+function stopAppPoll() {
+  if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
+}
+function startAppPoll(id) {
+  stopAppPoll();
+  state.pollTimer = setInterval(async () => {
+    const detailActive = document.getElementById('view-app-detail').classList.contains('active');
+    if (!detailActive || !state.currentApp || state.currentApp.id !== id) { stopAppPoll(); return; }
+    try {
+      const fresh = await api(`/apps/${id}`);
+      if (!fresh) return;
+      const prevCount = state.currentApp.sub_count;
+      state.currentApp = fresh;
+      // Aggiorna solo le tab "leggibili" (niente form in editing): overview e iscritti
+      if (state.currentTab === 'overview') renderTabOverview(fresh);
+      else if (state.currentTab === 'subscribers' && fresh.sub_count !== prevCount) renderTabSubscribers(fresh);
+    } catch(e) {}
+  }, 4000);
 }
 
 document.querySelectorAll('[data-view]').forEach(btn => {
