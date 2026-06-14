@@ -114,12 +114,50 @@ router.get('/:slug/init.js', (req, res) => {
   const base = BASE_URL();
   res.setHeader('Content-Type', 'application/javascript');
   res.setHeader('Cache-Control', 'no-cache');
+  const iconUrl = app.icon_path ? base + app.icon_path : '';
   res.send(`
 (function() {
   var SLUG = '${app.slug}';
   var BASE = '${base}';
   var VAPID = '${app.vapid_public}';
   var SUBSCRIBE_URL = BASE + '/' + SLUG + '/subscribe';
+  var APP_NAME = ${JSON.stringify(app.name || '')};
+  var ICON_URL = ${JSON.stringify(iconUrl)};
+  var THEME = ${JSON.stringify(app.theme_color || '#6366f1')};
+
+  // ─── iOS / PWA: inietta i tag che servono per la modalità standalone ─────────
+  // Senza "apple-mobile-web-app-capable" iOS apre l'icona come scorciatoia Safari
+  // (con barra indietro/condividi/ricarica). Questo la rende un'app full-screen,
+  // esattamente come fa Progressier. Nessun file da caricare sul sito.
+  (function injectPwaTags() {
+    var head = document.head || document.documentElement;
+    function meta(name, content) {
+      if (document.querySelector('meta[name="' + name + '"]')) return;
+      var m = document.createElement('meta');
+      m.setAttribute('name', name);
+      m.setAttribute('content', content);
+      head.appendChild(m);
+    }
+    meta('apple-mobile-web-app-capable', 'yes');
+    meta('mobile-web-app-capable', 'yes');
+    meta('apple-mobile-web-app-status-bar-style', 'black-translucent');
+    if (APP_NAME) meta('apple-mobile-web-app-title', APP_NAME);
+    if (THEME) meta('theme-color', THEME);
+    if (ICON_URL && !document.querySelector('link[rel="apple-touch-icon"]')) {
+      var l = document.createElement('link');
+      l.setAttribute('rel', 'apple-touch-icon');
+      l.setAttribute('href', ICON_URL);
+      head.appendChild(l);
+    }
+    // Se il sito non ha ancora un <link rel="manifest">, aggiungilo (stesso del manager)
+    if (!document.querySelector('link[rel="manifest"]')) {
+      var ml = document.createElement('link');
+      ml.setAttribute('rel', 'manifest');
+      ml.setAttribute('href', BASE + '/' + SLUG + '/manifest.json');
+      ml.setAttribute('crossorigin', 'use-credentials');
+      head.appendChild(ml);
+    }
+  })();
 
   function urlBase64ToUint8Array(base64String) {
     var padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -319,12 +357,18 @@ function buildInstallHtml(app, base) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Installa ${app.name}</title>
-<!-- Se già installata (standalone), apri subito l'app vera -->
+<!-- Se già installata (standalone), apri subito l'app vera.
+     Su iPhone NON installato: rimanda al sito vero, perché iOS blocca la modalità
+     full-screen al dominio dell'install. Installando dal sito (dove gira init.js)
+     l'app si apre senza barra Safari. -->
 <script>
 (function(){
-  var s = window.navigator.standalone === true ||
+  var standalone = window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
-  if (s && '${siteUrl}') { window.location.replace('${siteUrl}'); }
+  var site = '${siteUrl}';
+  if (standalone && site) { window.location.replace(site); return; }
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  if (isIOS && site) { window.location.replace(site); }
 })();
 </script>
 <link rel="manifest" href="${base}/${app.slug}/manifest.json" crossorigin="use-credentials">
@@ -423,19 +467,12 @@ footer{margin-top:24px;font-size:12px;color:#aaa}
 </html>`;
 }
 
-// /:slug/install → se site_url configurato, redirect a {origin}/install (pagina sul sito target)
-// Se non configurato, serve la pagina locale (funziona per Android, non per iOS full-screen)
+// /:slug/install → pagina di istruzioni (social proof + bottone notifiche + "vai al sito").
+// Niente redirect: prima causava 404 quando il sito non aveva una pagina /install.
+// L'installazione standalone iOS avviene aprendo il SITO VERO (dove init.js inietta i meta tag).
 router.get('/:slug/install', (req, res) => {
   const app = getApp(req.params.slug);
   if (!app) return res.status(404).send('App not found');
-
-  if (app.site_url) {
-    try {
-      const origin = new URL(app.site_url).origin;
-      return res.redirect(302, origin + '/install');
-    } catch (e) { /* site_url non valido: mostra pagina locale */ }
-  }
-
   const base = BASE_URL();
   res.setHeader('Content-Type', 'text/html');
   res.send(buildInstallHtml(app, base));
