@@ -124,6 +124,8 @@ router.get('/:slug/init.js', (req, res) => {
   var APP_NAME = ${JSON.stringify(app.name || '')};
   var ICON_URL = ${JSON.stringify(iconUrl)};
   var THEME = ${JSON.stringify(app.theme_color || '#6366f1')};
+  var BG = ${JSON.stringify(app.bg_color || '#ffffff')};
+  var SITE_URL = ${JSON.stringify(app.site_url || '')};
 
   // ─── iOS / PWA: inietta i tag che servono per la modalità standalone ─────────
   // Senza "apple-mobile-web-app-capable" iOS apre l'icona come scorciatoia Safari
@@ -149,14 +151,34 @@ router.get('/:slug/init.js', (req, res) => {
       l.setAttribute('href', ICON_URL);
       head.appendChild(l);
     }
-    // Se il sito non ha ancora un <link rel="manifest">, aggiungilo (stesso del manager)
-    if (!document.querySelector('link[rel="manifest"]')) {
+    // Manifest SAME-ORIGIN via Blob: iOS/Android vietano un manifest cross-origin
+    // (start_url/scope devono essere stesso origin del documento). Generandolo come
+    // Blob sul dominio del sito, start_url punta al sito stesso ed è valido.
+    try {
+      var origin = window.location.origin;
+      var startUrl = (SITE_URL && SITE_URL.indexOf(origin) === 0) ? SITE_URL : (origin + '/');
+      var mf = {
+        name: APP_NAME,
+        short_name: APP_NAME,
+        start_url: startUrl,
+        scope: origin + '/',
+        display: 'standalone',
+        background_color: BG,
+        theme_color: THEME,
+        icons: ICON_URL ? [
+          { src: ICON_URL, sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: ICON_URL, sizes: '512x512', type: 'image/png', purpose: 'any' }
+        ] : []
+      };
+      var blob = new Blob([JSON.stringify(mf)], { type: 'application/manifest+json' });
+      var blobUrl = URL.createObjectURL(blob);
+      var existing = document.querySelector('link[rel="manifest"]');
+      if (existing) existing.parentNode.removeChild(existing);
       var ml = document.createElement('link');
       ml.setAttribute('rel', 'manifest');
-      ml.setAttribute('href', BASE + '/' + SLUG + '/manifest.json');
-      ml.setAttribute('crossorigin', 'use-credentials');
+      ml.setAttribute('href', blobUrl);
       head.appendChild(ml);
-    }
+    } catch (e) { /* Blob non supportato: i meta apple bastano comunque per iOS */ }
   })();
 
   function urlBase64ToUint8Array(base64String) {
