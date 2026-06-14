@@ -137,6 +137,7 @@ router.get('/:slug/init.js', (req, res) => {
     // Override tramite window.__pwaManagerOverride (impostato dall'embed PRIMA che
     // questo script carichi — document.currentScript è null per script asincroni)
     var ov = window.__pwaManagerOverride || {};
+    var hasOverride = !!window.__pwaManagerOverride;
     var effectiveIconUrl = ov.iconUrl || ICON_URL;
     var effectiveName    = ov.appName  || APP_NAME;
     var overrideStartUrl = ov.startUrl || null;
@@ -155,43 +156,51 @@ router.get('/:slug/init.js', (req, res) => {
     meta('apple-mobile-web-app-status-bar-style', 'black-translucent');
     if (effectiveName) meta('apple-mobile-web-app-title', effectiveName);
     if (THEME) meta('theme-color', THEME);
-    // Sostituisce apple-touch-icon esistente (systeme.io ne mette uno suo)
+    // Sostituisce apple-touch-icon esistente (systeme.io ne mette uno suo).
+    // MA: se il sito ha già la sua icona e non c'è override, NON toccarla — è un
+    // sito self-hosted (es. Cammino Interiore) che gestisce da sé i propri tag.
     if (effectiveIconUrl) {
       var existingIcon = document.querySelector('link[rel="apple-touch-icon"]');
-      if (existingIcon) existingIcon.parentNode.removeChild(existingIcon);
-      var l = document.createElement('link');
-      l.setAttribute('rel', 'apple-touch-icon');
-      l.setAttribute('href', effectiveIconUrl);
-      head.appendChild(l);
+      if (!(existingIcon && !hasOverride)) {
+        if (existingIcon) existingIcon.parentNode.removeChild(existingIcon);
+        var l = document.createElement('link');
+        l.setAttribute('rel', 'apple-touch-icon');
+        l.setAttribute('href', effectiveIconUrl);
+        head.appendChild(l);
+      }
     }
     // Manifest SAME-ORIGIN via Blob: iOS/Android vietano un manifest cross-origin
     // (start_url/scope devono essere stesso origin del documento). Generandolo come
     // Blob sul dominio del sito, start_url punta al sito stesso ed è valido.
     try {
-      var origin = window.location.origin;
-      var startUrl = overrideStartUrl ||
-        ((SITE_URL && SITE_URL.indexOf(origin) === 0) ? SITE_URL : (origin + '/'));
-      var mf = {
-        name: effectiveName,
-        short_name: effectiveName,
-        start_url: startUrl,
-        scope: origin + '/',
-        display: 'standalone',
-        background_color: BG,
-        theme_color: THEME,
-        icons: effectiveIconUrl ? [
-          { src: effectiveIconUrl, sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: effectiveIconUrl, sizes: '512x512', type: 'image/png', purpose: 'any' }
-        ] : []
-      };
-      var blob = new Blob([JSON.stringify(mf)], { type: 'application/manifest+json' });
-      var blobUrl = URL.createObjectURL(blob);
       var existing = document.querySelector('link[rel="manifest"]');
-      if (existing) existing.parentNode.removeChild(existing);
-      var ml = document.createElement('link');
-      ml.setAttribute('rel', 'manifest');
-      ml.setAttribute('href', blobUrl);
-      head.appendChild(ml);
+      // Se il sito ha già un suo manifest e non c'è override, lascialo: è un sito
+      // self-hosted (es. Cammino) col proprio manifest same-origin corretto.
+      if (!(existing && !hasOverride)) {
+        var origin = window.location.origin;
+        var startUrl = overrideStartUrl ||
+          ((SITE_URL && SITE_URL.indexOf(origin) === 0) ? SITE_URL : (origin + '/'));
+        var mf = {
+          name: effectiveName,
+          short_name: effectiveName,
+          start_url: startUrl,
+          scope: origin + '/',
+          display: 'standalone',
+          background_color: BG,
+          theme_color: THEME,
+          icons: effectiveIconUrl ? [
+            { src: effectiveIconUrl, sizes: '192x192', type: 'image/png', purpose: 'any' },
+            { src: effectiveIconUrl, sizes: '512x512', type: 'image/png', purpose: 'any' }
+          ] : []
+        };
+        var blob = new Blob([JSON.stringify(mf)], { type: 'application/manifest+json' });
+        var blobUrl = URL.createObjectURL(blob);
+        if (existing) existing.parentNode.removeChild(existing);
+        var ml = document.createElement('link');
+        ml.setAttribute('rel', 'manifest');
+        ml.setAttribute('href', blobUrl);
+        head.appendChild(ml);
+      }
     } catch (e) { /* Blob non supportato: i meta apple bastano comunque per iOS */ }
   })();
 
