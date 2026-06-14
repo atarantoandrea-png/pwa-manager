@@ -388,9 +388,7 @@ function buildInstallHtml(app, base) {
   var standalone = window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
   var site = '${siteUrl}';
-  if (standalone && site) { window.location.replace(site); return; }
-  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  if (isIOS && site) { window.location.replace(site); }
+  if (standalone && site) { window.location.replace(site); }
 })();
 </script>
 <link rel="manifest" href="${base}/${app.slug}/manifest.json" crossorigin="use-credentials">
@@ -437,9 +435,12 @@ footer{margin-top:24px;font-size:12px;color:#aaa}
 
   <div id="ios-steps" class="steps" style="display:none">
     <h3>Installa su iPhone / iPad</h3>
-    <div class="step"><div class="step-num">1</div><p>Tocca il pulsante <strong>Condividi</strong> nella barra di Safari</p></div>
+    ${siteUrl ? `<div class="step"><div class="step-num">1</div><p>Apri <strong><a href="${siteUrl}" style="color:var(--accent);text-decoration:none">${siteUrl.replace(/^https?:\/\//, '')}</a></strong> in Safari</p></div>
+    <div class="step"><div class="step-num">2</div><p>Tocca il pulsante <strong>Condividi</strong> &#x2197; nella barra di Safari</p></div>
+    <div class="step"><div class="step-num">3</div><p>Scorri e tocca <strong>"Aggiungi a Home"</strong></p></div>
+    <div class="step"><div class="step-num">4</div><p>Tocca <strong>Aggiungi</strong> — l'icona apparirà sulla schermata Home</p></div>` : `<div class="step"><div class="step-num">1</div><p>Tocca il pulsante <strong>Condividi</strong> &#x2197; nella barra di Safari</p></div>
     <div class="step"><div class="step-num">2</div><p>Scorri e tocca <strong>"Aggiungi a Home"</strong></p></div>
-    <div class="step"><div class="step-num">3</div><p>Tocca <strong>Aggiungi</strong> — l'icona apparirà sulla schermata Home</p></div>
+    <div class="step"><div class="step-num">3</div><p>Tocca <strong>Aggiungi</strong> — l'icona apparirà sulla schermata Home</p></div>`}
   </div>
 
   <div id="android-steps" class="steps" style="display:none">
