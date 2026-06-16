@@ -30,4 +30,5 @@ app.get('/', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`PWA Manager on port ${PORT}`);
+  require('./lib/scheduler').start();
 });

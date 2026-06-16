@@ -54,6 +54,26 @@ db.exec(`
   );
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS scheduled_notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    app_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT DEFAULT '',
+    icon_url TEXT DEFAULT '',
+    action_url TEXT DEFAULT '',
+    image_url TEXT DEFAULT '',
+    time_hhmm TEXT NOT NULL DEFAULT '09:00',
+    every_n_days INTEGER NOT NULL DEFAULT 1,
+    active INTEGER NOT NULL DEFAULT 1,
+    next_run_at INTEGER,
+    last_run_at INTEGER,
+    last_sent INTEGER DEFAULT 0,
+    created_at INTEGER DEFAULT (strftime('%s','now')),
+    FOREIGN KEY (app_id) REFERENCES apps(id) ON DELETE CASCADE
+  );
+`);
+
 // Migrations
 try { db.exec(`ALTER TABLE apps ADD COLUMN install_url TEXT DEFAULT ''`); } catch(e) {}
 

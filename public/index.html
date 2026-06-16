@@ -329,12 +329,14 @@ tbody tr:hover{background:#fafafa}
             <button class="tab active" data-tab="overview">Panoramica</button>
             <button class="tab" data-tab="install">Installazione</button>
             <button class="tab" data-tab="push">Notifiche Push</button>
+            <button class="tab" data-tab="scheduled">Programmate</button>
             <button class="tab" data-tab="subscribers">Iscritti</button>
             <button class="tab" data-tab="settings">Impostazioni</button>
           </div>
           <div id="tab-overview"></div>
           <div id="tab-install" style="display:none"></div>
           <div id="tab-push" style="display:none"></div>
+          <div id="tab-scheduled" style="display:none"></div>
           <div id="tab-subscribers" style="display:none"></div>
           <div id="tab-settings" style="display:none"></div>
         </div>
@@ -615,7 +617,7 @@ function renderAppDetail(app) {
 
 function switchTab(tab) {
   state.currentTab = tab;
-  ['overview','install','push','subscribers','settings'].forEach(t => {
+  ['overview','install','push','scheduled','subscribers','settings'].forEach(t => {
     document.getElementById('tab-' + t).style.display = t === tab ? 'block' : 'none';
   });
   document.querySelectorAll('.tab').forEach(t => {
@@ -625,6 +627,7 @@ function switchTab(tab) {
   if (tab === 'overview') renderTabOverview(app);
   else if (tab === 'install') renderTabInstall(app);
   else if (tab === 'push') renderTabPush(app);
+  else if (tab === 'scheduled') renderTabScheduled(app);
   else if (tab === 'subscribers') renderTabSubscribers(app);
   else if (tab === 'settings') renderTabSettings(app);
 }
@@ -1121,6 +1124,78 @@ document.querySelectorAll('.modal-overlay').forEach(el => {
 });
 
 // ─── API ─────────────────────────────────────────────────────────────────────
+// ─── TAB: PROGRAMMATE ────────────────────────────────────────────────────────
+async function renderTabScheduled(app) {
+  const rows = await api(`/apps/${app.id}/scheduled`);
+  const list = Array.isArray(rows) ? rows : [];
+  const everyLabel = n => (Number(n) === 1 ? 'ogni giorno' : `ogni ${n} giorni`);
+  document.getElementById('tab-scheduled').innerHTML = `
+    <div class="card">
+      <div class="card-title">⏰ Nuova notifica programmata</div>
+      <p style="font-size:13px;color:var(--text-soft);margin-bottom:14px">Il messaggio viene inviato da solo agli iscritti, anche quando non sei online. L'orario è in <strong>ora italiana</strong>.</p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <input id="sched-title" placeholder="Titolo (es. Promemoria del giorno)" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+        <textarea id="sched-body" placeholder="Messaggio" rows="2" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);resize:vertical;font-family:inherit"></textarea>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center">
+          <label style="font-size:13px;color:var(--text-soft)">Ora <input type="time" id="sched-time" value="09:00" style="padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);margin-left:6px"></label>
+          <label style="font-size:13px;color:var(--text-soft)">Ripeti ogni <input type="number" id="sched-every" value="1" min="1" max="365" style="width:64px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);margin:0 6px"> giorni</label>
+        </div>
+        <input id="sched-url" placeholder="Link da aprire al tocco (opzionale)" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm)">
+        <div><button class="btn btn-accent" onclick="schedCreate(${app.id})">➕ Aggiungi notifica programmata</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📅 Programmate <span class="badge">${list.length}</span></div>
+      ${list.length === 0 ? `<p style="font-size:13px;color:var(--text-muted)">Nessuna notifica programmata. Creane una qui sopra.</p>` : `
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${list.map(n => `
+          <div style="border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;${n.active ? '' : 'opacity:.55'}">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+              <div style="min-width:0">
+                <div style="font-weight:700;font-size:14px">${escHtml(n.title)}</div>
+                ${n.body ? `<div style="font-size:13px;color:var(--text-soft);margin-top:2px">${escHtml(n.body)}</div>` : ''}
+                <div style="font-size:12px;color:var(--text-muted);margin-top:6px">
+                  🔁 ${everyLabel(n.every_n_days)} alle <strong>${escHtml(n.time_hhmm)}</strong>${n.active ? ` · prossimo invio: ${fmtDate(n.next_run_at)}` : ' · in pausa'}
+                </div>
+              </div>
+              <div style="display:flex;gap:6px;flex-shrink:0">
+                <button class="btn btn-ghost btn-sm" onclick="schedToggle(${app.id},${n.id},${n.active ? 0 : 1})">${n.active ? '⏸ Pausa' : '▶ Attiva'}</button>
+                <button class="btn btn-ghost btn-sm" onclick="schedDelete(${app.id},${n.id})">🗑</button>
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>`}
+    </div>`;
+}
+
+async function schedCreate(appId) {
+  const title = document.getElementById('sched-title').value.trim();
+  if (!title) { alert('Scrivi almeno il titolo'); return; }
+  const data = {
+    title,
+    body: document.getElementById('sched-body').value.trim(),
+    time_hhmm: document.getElementById('sched-time').value || '09:00',
+    every_n_days: parseInt(document.getElementById('sched-every').value, 10) || 1,
+    action_url: document.getElementById('sched-url').value.trim()
+  };
+  const res = await api(`/apps/${appId}/scheduled`, 'POST', data);
+  if (res && !res.error) renderTabScheduled(state.currentApp);
+  else alert('Errore: ' + ((res && res.error) || 'riprova'));
+}
+
+async function schedToggle(appId, sid, active) {
+  await api(`/apps/${appId}/scheduled/${sid}`, 'PUT', { active });
+  renderTabScheduled(state.currentApp);
+}
+
+async function schedDelete(appId, sid) {
+  if (!confirm('Eliminare questa notifica programmata?')) return;
+  await api(`/apps/${appId}/scheduled/${sid}`, 'DELETE');
+  renderTabScheduled(state.currentApp);
+}
+
 async function api(path, method = 'GET', body) {
   try {
     const opts = { method, headers: { 'Content-Type': 'application/json' } };

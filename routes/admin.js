@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const webpush = require('web-push');
 const db = require('../db/db');
+const { firstNextRun } = require('../lib/scheduler');
 
 // Multer for icon uploads
 const storage = multer.diskStorage({
@@ -201,6 +202,68 @@ router.post('/apps/:id/notify', requireAuth, async (req, res) => {
   `).run(app.id, title, body || '', icon_url || '', action_url || '', image_url || '', sent, failed);
 
   res.json({ ok: true, sent, failed, removed: removeIds.length });
+});
+
+// ─── NOTIFICHE PROGRAMMATE (ricorrenti) ───────────────────────────────────────
+
+router.get('/apps/:id/scheduled', requireAuth, (req, res) => {
+  const rows = db.prepare(`
+    SELECT * FROM scheduled_notifications WHERE app_id = ? ORDER BY active DESC, next_run_at ASC
+  `).all(req.params.id);
+  res.json(rows);
+});
+
+router.post('/apps/:id/scheduled', requireAuth, (req, res) => {
+  const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(req.params.id);
+  if (!app) return res.status(404).json({ error: 'App non trovata' });
+
+  const { title, body, icon_url, action_url, image_url, time_hhmm } = req.body;
+  if (!title) return res.status(400).json({ error: 'Titolo obbligatorio' });
+  let everyN = parseInt(req.body.every_n_days, 10);
+  if (isNaN(everyN) || everyN < 1) everyN = 1;
+  const time = /^\d{1,2}:\d{2}$/.test(time_hhmm || '') ? time_hhmm : '09:00';
+
+  const nextRun = firstNextRun(time, Date.now());
+  const info = db.prepare(`
+    INSERT INTO scheduled_notifications (app_id, title, body, icon_url, action_url, image_url, time_hhmm, every_n_days, active, next_run_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+  `).run(app.id, title, body || '', icon_url || '', action_url || '', image_url || '', time, everyN, nextRun);
+
+  res.json(db.prepare('SELECT * FROM scheduled_notifications WHERE id = ?').get(info.lastInsertRowid));
+});
+
+router.put('/apps/:id/scheduled/:sid', requireAuth, (req, res) => {
+  const cur = db.prepare('SELECT * FROM scheduled_notifications WHERE id = ? AND app_id = ?').get(req.params.sid, req.params.id);
+  if (!cur) return res.status(404).json({ error: 'Notifica non trovata' });
+
+  const title = req.body.title != null ? req.body.title : cur.title;
+  const body = req.body.body != null ? req.body.body : cur.body;
+  const icon_url = req.body.icon_url != null ? req.body.icon_url : cur.icon_url;
+  const action_url = req.body.action_url != null ? req.body.action_url : cur.action_url;
+  const image_url = req.body.image_url != null ? req.body.image_url : cur.image_url;
+  const time = /^\d{1,2}:\d{2}$/.test(req.body.time_hhmm || '') ? req.body.time_hhmm : cur.time_hhmm;
+  let everyN = req.body.every_n_days != null ? parseInt(req.body.every_n_days, 10) : cur.every_n_days;
+  if (isNaN(everyN) || everyN < 1) everyN = 1;
+  const active = req.body.active != null ? (req.body.active ? 1 : 0) : cur.active;
+
+  // Ricalcola il prossimo invio se cambia orario, o se viene riattivata
+  let nextRun = cur.next_run_at;
+  const timeChanged = time !== cur.time_hhmm;
+  const reactivated = active === 1 && cur.active === 0;
+  if (timeChanged || reactivated || !nextRun) nextRun = firstNextRun(time, Date.now());
+
+  db.prepare(`
+    UPDATE scheduled_notifications
+    SET title=?, body=?, icon_url=?, action_url=?, image_url=?, time_hhmm=?, every_n_days=?, active=?, next_run_at=?
+    WHERE id=?
+  `).run(title, body, icon_url, action_url, image_url, time, everyN, active, nextRun, cur.id);
+
+  res.json(db.prepare('SELECT * FROM scheduled_notifications WHERE id = ?').get(cur.id));
+});
+
+router.delete('/apps/:id/scheduled/:sid', requireAuth, (req, res) => {
+  db.prepare('DELETE FROM scheduled_notifications WHERE id = ? AND app_id = ?').run(req.params.sid, req.params.id);
+  res.json({ ok: true });
 });
 
 module.exports = router;
