@@ -668,7 +668,12 @@ function renderTabOverview(app) {
 function renderTabInstall(app) {
   const base = getBase();
   const defaultInstallUrl = `${base}/${app.slug}/install`;
-  const installUrl = app.install_url || defaultInstallUrl;
+  // Auto-correzione: ignora un install_url salvato male (es. slug "undefined")
+  // e usa sempre il link corretto basato sullo slug reale dell'app.
+  let installUrl = app.install_url || defaultInstallUrl;
+  if (!app.slug || installUrl.indexOf('/undefined/') !== -1 || installUrl.indexOf('/null/') !== -1) {
+    installUrl = defaultInstallUrl;
+  }
   const snippet1 = `<!-- Aggiungi nel <head> del tuo sito -->
 <link rel="manifest" href="${base}/${app.slug}/manifest.json" crossorigin="use-credentials">
 <meta name="theme-color" content="${app.theme_color}">
@@ -725,7 +730,9 @@ importScripts('${base}/${app.slug}/sw-core.js');`;
 
 async function saveInstallUrl(appId) {
   const input = document.getElementById('install-url-input');
-  const val = input.value.trim();
+  let val = input.value.trim();
+  // Non salvare mai un URL rotto (slug "undefined"/"null"): meglio vuoto → usa il default
+  if (val.indexOf('/undefined/') !== -1 || val.indexOf('/null/') !== -1) val = '';
   const updated = await api(`/apps/${appId}`, { method: 'PUT', body: JSON.stringify({ install_url: val }) });
   if (updated) {
     state.currentApp = updated;
