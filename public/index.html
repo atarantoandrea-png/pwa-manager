@@ -687,14 +687,23 @@ importScripts('${base}/${app.slug}/sw-core.js');`;
 
   const downloadUrl = `${base}/${app.slug}/install.html`;
   const hasCustom = !!customInstallUrl;
-  const statusHtml = hasCustom
-    ? `<span style="color:#16a34a;font-size:12px">✓ Pagina personalizzata configurata — iOS si aprirà in modalità standalone</span>`
-    : `<span style="color:#d97706;font-size:12px">⚠ Nessuna pagina personalizzata — funziona su Android/desktop, su iPhone la barra Safari rimane visibile</span>`;
+  let autoTarget = '';
+  if (!hasCustom && app.site_url) {
+    try { autoTarget = new URL(app.site_url).origin + '/install'; } catch(e) {}
+  }
+  let statusHtml;
+  if (hasCustom) {
+    statusHtml = `<span style="color:#16a34a;font-size:12px">✓ Reindirizza a pagina personalizzata → iOS standalone attivo</span>`;
+  } else if (autoTarget) {
+    statusHtml = `<span style="color:#16a34a;font-size:12px">✓ Reindirizza automaticamente a <strong>${escHtml(autoTarget)}</strong> — iOS standalone attivo se quella pagina esiste</span>`;
+  } else {
+    statusHtml = `<span style="color:#d97706;font-size:12px">⚠ Nessun sito configurato — mostra la pagina del manager (Android/desktop ok, barra Safari su iPhone)</span>`;
+  }
 
   document.getElementById('tab-install').innerHTML = `
     <div class="card">
       <div class="card-title">🔗 Link da condividere</div>
-      <p style="font-size:13px;color:var(--text-soft);margin-bottom:10px">Questo link apre sempre la pagina di installazione, sia che tu abbia configurato una pagina personalizzata o meno.</p>
+      <p style="font-size:13px;color:var(--text-soft);margin-bottom:10px">Condividi questo link: reindirizzerà automaticamente alla pagina giusta in base al sito configurato.</p>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
         <input type="text" value="${escHtml(managerInstallUrl)}" readonly
           style="flex:1;font-size:13px;font-family:monospace;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:#f8fafc;color:var(--text)">
@@ -705,8 +714,8 @@ importScripts('${base}/${app.slug}/sw-core.js');`;
     </div>
 
     <div class="card">
-      <div class="card-title">📱 Pagina install personalizzata <span class="badge">opzionale — per iPhone standalone</span></div>
-      <p style="font-size:13px;color:var(--text-soft);margin-bottom:10px">Per nascondere la barra Safari su iPhone: scarica <code>install.html</code>, caricalo sul tuo sito come <code>/install</code>, poi inserisci qui l'URL. Il manager reindirizzerà automaticamente.</p>
+      <div class="card-title">📱 Pagina install personalizzata <span class="badge">opzionale</span></div>
+      <p style="font-size:13px;color:var(--text-soft);margin-bottom:10px">Lascia vuoto: se hai impostato il "Sito web" qui sopra, il redirect avviene automaticamente a <code>{sito}/install</code>. Compila solo se la tua pagina install è su un URL diverso.</p>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
         <input id="install-url-input" type="url" value="${escHtml(customInstallUrl)}"
           style="flex:1;font-size:13px;font-family:monospace;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:#f8fafc;color:var(--text)"

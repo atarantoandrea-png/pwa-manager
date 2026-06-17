@@ -519,17 +519,21 @@ footer{margin-top:24px;font-size:12px;color:#aaa}
 </html>`;
 }
 
-// /:slug/install → se l'app ha un install_url personalizzato, redirige lì (same-origin
-// per iOS standalone). Altrimenti serve direttamente la pagina del manager (funziona
-// per Android/desktop; su iOS la barra Safari rimane ma almeno non dà 404).
+// /:slug/install
+// 1. install_url esplicito → redirect lì (override manuale)
+// 2. site_url configurato → redirect a {origin}/install (auto, same-origin per iOS standalone)
+// 3. nessuno dei due → serve la pagina del manager direttamente
 router.get('/:slug/install', (req, res) => {
   const app = getApp(req.params.slug);
   if (!app) return res.status(404).send('App not found');
   if (app.install_url) {
+    try { new URL(app.install_url); return res.redirect(302, app.install_url); } catch (e) {}
+  }
+  if (app.site_url) {
     try {
-      new URL(app.install_url); // valida l'URL
-      return res.redirect(302, app.install_url);
-    } catch (e) { /* install_url non valido: serve pagina locale */ }
+      const origin = new URL(app.site_url).origin;
+      return res.redirect(302, origin + '/install');
+    } catch (e) {}
   }
   const base = BASE_URL();
   res.setHeader('Content-Type', 'text/html');
