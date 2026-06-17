@@ -519,20 +519,17 @@ footer{margin-top:24px;font-size:12px;color:#aaa}
 </html>`;
 }
 
-// /:slug/install → reindirizza alla pagina /install SELF-HOSTED sul dominio del sito.
-// iOS, quando fai "Aggiungi a Home", apre solo URL dello stesso dominio dell'app:
-// se l'install page sta sul manager (cross-origin), l'app installata apre Safari
-// con la barra invece del full-screen. Per questo il link deve rimbalzare al sito,
-// dove i meta apple statici + manifest same-origin fanno partire lo standalone.
-// (Le app servite da piattaforme senza /install — es. systeme.io — non usano questa route.)
+// /:slug/install → se l'app ha un install_url personalizzato, redirige lì (same-origin
+// per iOS standalone). Altrimenti serve direttamente la pagina del manager (funziona
+// per Android/desktop; su iOS la barra Safari rimane ma almeno non dà 404).
 router.get('/:slug/install', (req, res) => {
   const app = getApp(req.params.slug);
   if (!app) return res.status(404).send('App not found');
-  if (app.site_url) {
+  if (app.install_url) {
     try {
-      const origin = new URL(app.site_url).origin;
-      return res.redirect(302, origin + '/install');
-    } catch (e) { /* site_url non valido: mostra la pagina locale del manager */ }
+      new URL(app.install_url); // valida l'URL
+      return res.redirect(302, app.install_url);
+    } catch (e) { /* install_url non valido: serve pagina locale */ }
   }
   const base = BASE_URL();
   res.setHeader('Content-Type', 'text/html');

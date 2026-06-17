@@ -670,13 +670,14 @@ function renderTabOverview(app) {
 // ─── TAB: INSTALL ─────────────────────────────────────────────────────────────
 function renderTabInstall(app) {
   const base = getBase();
-  const defaultInstallUrl = `${base}/${app.slug}/install`;
-  // Auto-correzione: ignora un install_url salvato male (es. slug "undefined")
-  // e usa sempre il link corretto basato sullo slug reale dell'app.
-  let installUrl = app.install_url || defaultInstallUrl;
-  if (!app.slug || installUrl.indexOf('/undefined/') !== -1 || installUrl.indexOf('/null/') !== -1) {
-    installUrl = defaultInstallUrl;
+  const managerInstallUrl = `${base}/${app.slug}/install`;
+
+  // Normalizza install_url: ignora valori rotti (slug "undefined"/"null")
+  let customInstallUrl = app.install_url || '';
+  if (customInstallUrl.indexOf('/undefined/') !== -1 || customInstallUrl.indexOf('/null/') !== -1) {
+    customInstallUrl = '';
   }
+
   const snippet1 = `<!-- Aggiungi nel <head> del tuo sito -->
 <link rel="manifest" href="${base}/${app.slug}/manifest.json" crossorigin="use-credentials">
 <meta name="theme-color" content="${app.theme_color}">
@@ -685,23 +686,38 @@ function renderTabInstall(app) {
 importScripts('${base}/${app.slug}/sw-core.js');`;
 
   const downloadUrl = `${base}/${app.slug}/install.html`;
+  const hasCustom = !!customInstallUrl;
+  const statusHtml = hasCustom
+    ? `<span style="color:#16a34a;font-size:12px">✓ Pagina personalizzata configurata — iOS si aprirà in modalità standalone</span>`
+    : `<span style="color:#d97706;font-size:12px">⚠ Nessuna pagina personalizzata — funziona su Android/desktop, su iPhone la barra Safari rimane visibile</span>`;
+
   document.getElementById('tab-install').innerHTML = `
     <div class="card">
-      <div class="card-title">🔗 Pagina di installazione</div>
-      <p style="font-size:13px;color:var(--text-soft);margin-bottom:12px">Condividi questo link oppure scarica la pagina e mettila sul tuo sito — obbligatorio per nascondere la barra Safari su iPhone.</p>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-        <input id="install-url-input" type="url" value="${escHtml(installUrl)}"
-          style="flex:1;font-size:13px;font-family:monospace;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:#f8fafc;color:var(--text)"
-          placeholder="${defaultInstallUrl}">
-        <button class="btn btn-ghost btn-sm" onclick="copyText(document.getElementById('install-url-input').value,this)">Copia</button>
-        <button class="btn btn-accent btn-sm" onclick="saveInstallUrl(${app.id})">Salva</button>
-        <a id="install-url-open" href="${escHtml(installUrl)}" target="_blank" class="btn btn-ghost btn-sm">Apri →</a>
+      <div class="card-title">🔗 Link da condividere</div>
+      <p style="font-size:13px;color:var(--text-soft);margin-bottom:10px">Questo link apre sempre la pagina di installazione, sia che tu abbia configurato una pagina personalizzata o meno.</p>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <input type="text" value="${escHtml(managerInstallUrl)}" readonly
+          style="flex:1;font-size:13px;font-family:monospace;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:#f8fafc;color:var(--text)">
+        <button class="btn btn-ghost btn-sm" onclick="copyText('${escHtml(managerInstallUrl)}',this)">Copia</button>
+        <a href="${escHtml(managerInstallUrl)}" target="_blank" class="btn btn-ghost btn-sm">Apri →</a>
       </div>
-      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <div style="margin-bottom:4px">${statusHtml}</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📱 Pagina install personalizzata <span class="badge">opzionale — per iPhone standalone</span></div>
+      <p style="font-size:13px;color:var(--text-soft);margin-bottom:10px">Per nascondere la barra Safari su iPhone: scarica <code>install.html</code>, caricalo sul tuo sito come <code>/install</code>, poi inserisci qui l'URL. Il manager reindirizzerà automaticamente.</p>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <input id="install-url-input" type="url" value="${escHtml(customInstallUrl)}"
+          style="flex:1;font-size:13px;font-family:monospace;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:#f8fafc;color:var(--text)"
+          placeholder="https://tuosito.com/install">
+        <button class="btn btn-accent btn-sm" onclick="saveInstallUrl(${app.id})">Salva</button>
+        ${hasCustom ? `<a id="install-url-open" href="${escHtml(customInstallUrl)}" target="_blank" class="btn btn-ghost btn-sm">Apri →</a>` : `<span id="install-url-open"></span>`}
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
         <a href="${downloadUrl}" download="install.html" class="btn btn-ghost btn-sm">📥 Scarica install.html</a>
         <button class="btn btn-ghost btn-sm" onclick="copyEmbedHtml(${app.id})">📋 Copia HTML per sito</button>
       </div>
-      <p style="font-size:12px;color:var(--text-muted);margin-top:10px">💡 Inserisci l'URL della tua pagina install personalizzata (es. su systeme.io) oppure usa quello di default. <strong>HTML per sito</strong>: genera il codice da incollare nel builder del tuo sito.</p>
     </div>
 
     <div class="card">
@@ -734,14 +750,20 @@ importScripts('${base}/${app.slug}/sw-core.js');`;
 async function saveInstallUrl(appId) {
   const input = document.getElementById('install-url-input');
   let val = input.value.trim();
-  // Non salvare mai un URL rotto (slug "undefined"/"null"): meglio vuoto → usa il default
   if (val.indexOf('/undefined/') !== -1 || val.indexOf('/null/') !== -1) val = '';
   const updated = await api(`/apps/${appId}`, { method: 'PUT', body: JSON.stringify({ install_url: val }) });
   if (updated) {
     state.currentApp = updated;
-    document.getElementById('install-url-open').href = val || updated.install_url || '';
+    // Aggiorna il link "Apri →" se esiste
+    const openLink = document.getElementById('install-url-open');
+    if (openLink && val) {
+      openLink.href = val;
+      openLink.style.display = '';
+    }
     const btn = document.querySelector('[onclick="saveInstallUrl(' + appId + ')"]');
     if (btn) { btn.textContent = '✓ Salvato'; setTimeout(() => btn.textContent = 'Salva', 1500); }
+    // Ri-renderizza il tab per aggiornare il badge di stato
+    renderTabInstall(updated);
   }
 }
 
