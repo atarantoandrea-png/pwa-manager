@@ -669,6 +669,7 @@ function renderTabOverview(app) {
 
 // ─── TAB: INSTALL ─────────────────────────────────────────────────────────────
 function renderTabInstall(app) {
+  if (!app || !app.slug) { document.getElementById('tab-install').innerHTML = '<p style="color:var(--text-muted);padding:16px">Caricamento…</p>'; return; }
   const base = getBase();
   const managerInstallUrl = `${base}/${app.slug}/install`;
 
@@ -760,18 +761,11 @@ async function saveInstallUrl(appId) {
   const input = document.getElementById('install-url-input');
   let val = input.value.trim();
   if (val.indexOf('/undefined/') !== -1 || val.indexOf('/null/') !== -1) val = '';
-  const updated = await api(`/apps/${appId}`, { method: 'PUT', body: JSON.stringify({ install_url: val }) });
-  if (updated) {
+  const updated = await api(`/apps/${appId}`, 'PUT', { install_url: val });
+  if (updated && updated.id) {
     state.currentApp = updated;
-    // Aggiorna il link "Apri →" se esiste
-    const openLink = document.getElementById('install-url-open');
-    if (openLink && val) {
-      openLink.href = val;
-      openLink.style.display = '';
-    }
     const btn = document.querySelector('[onclick="saveInstallUrl(' + appId + ')"]');
     if (btn) { btn.textContent = '✓ Salvato'; setTimeout(() => btn.textContent = 'Salva', 1500); }
-    // Ri-renderizza il tab per aggiornare il badge di stato
     renderTabInstall(updated);
   }
 }
