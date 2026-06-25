@@ -26,12 +26,10 @@ const requireAuth = (req, res, next) => {
 // ─── AUTH ───────────────────────────────────────────────────────────────────
 
 router.post('/auth/login', (req, res) => {
-  const { username, password } = req.body;
-  const okUser = (process.env.ADMIN_USERNAME || 'Andrea');
+  const { password } = req.body;
   const okPass = (process.env.ADMIN_PASSWORD || 'Angra.120');
-  if (username === okUser && password === okPass) {
+  if (password === okPass) {
     req.session.admin = true;
-    req.session.username = username;
     res.json({ ok: true });
   } else {
     res.status(401).json({ error: 'Credenziali non valide' });

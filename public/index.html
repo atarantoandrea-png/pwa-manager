@@ -241,12 +241,8 @@ tbody tr:hover{background:#fafafa}
     <p>Accedi al tuo pannello di gestione PWA</p>
     <form id="login-form">
       <div class="field">
-        <label>Nome utente</label>
-        <input type="text" id="login-username" placeholder="Nome utente" autofocus autocomplete="off">
-      </div>
-      <div class="field">
         <label>Password</label>
-        <input type="password" id="login-password" placeholder="••••••••" autocomplete="off">
+        <input type="password" id="login-password" placeholder="••••••••" autofocus autocomplete="off">
       </div>
       <button type="submit" class="btn-primary" id="login-btn">Accedi →</button>
       <div id="login-error">Credenziali non valide. Riprova.</div>
@@ -441,11 +437,10 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const btn = document.getElementById('login-btn');
   const err = document.getElementById('login-error');
-  const username = document.getElementById('login-username').value;
   const password = document.getElementById('login-password').value;
   btn.disabled = true; btn.textContent = 'Accesso...';
   err.style.display = 'none';
-  const res = await api('/auth/login', 'POST', { username, password });
+  const res = await api('/auth/login', 'POST', { password });
   if (res.ok) {
     showApp();
   } else {
