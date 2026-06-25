@@ -25,6 +25,7 @@ app.use('/api', require('./routes/admin'));
 app.use('/', require('./routes/public'));
 
 app.get('/', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   res.sendFile(path.join(__dirname, 'public/index.html'));
 });
 
